@@ -27,3 +27,20 @@ attribution:
   bootstrap_resamples: 2000
   ci_level: 0.95
   max_ci_width_for_auto: 0.35
+
+webhooks:
+  # Event types each REST app subscribes to (brief section 5.3).
+  event_types:
+    merchant:
+      - CHECKOUT.ORDER.APPROVED
+      - PAYMENT.AUTHORIZATION.CREATED
+      - PAYMENT.AUTHORIZATION.VOIDED
+      - PAYMENT.CAPTURE.COMPLETED
+      - PAYMENT.CAPTURE.REFUNDED
+      - CUSTOMER.DISPUTE.CREATED
+      - CUSTOMER.DISPUTE.UPDATED
+      - CUSTOMER.DISPUTE.RESOLVED
+    operator:
+      - PAYMENT.PAYOUTSBATCH.SUCCESS
+      - PAYMENT.PAYOUTSBATCH.DENIED
+  path_prefix: /webhooks/paypal

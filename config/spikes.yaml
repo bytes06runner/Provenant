@@ -55,3 +55,18 @@ s8:
   # (invalid_domain), so this stays empty locally; set the public domain once deployed.
   client_token_domains: []
   presentation_mode: "auto"
+
+s5:
+  # Webhooks over a cloudflared quick tunnel. Registrations are deleted when the spike ends.
+  host: "127.0.0.1"
+  port: 8709
+  cloudflared: "bin/cloudflared"
+  tunnel_timeout_seconds: 60
+  # A new quick-tunnel hostname can take over a minute to resolve (seen in S5).
+  public_reachable_timeout_seconds: 180
+  delivery_timeout_seconds: 600
+  poll_interval_seconds: 3
+  store_url: "sqlite:///spikes/out/webhooks.db"
+  simulate_event_type: PAYMENT.AUTHORIZATION.VOIDED
+  payout_amount: "1.00"
+  payout_receiver_env: PAYPAL_BUYER_A_EMAIL

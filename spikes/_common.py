@@ -118,15 +118,18 @@ def spike_config() -> dict[str, Any]:
     return load_yaml("spikes.yaml")
 
 
-def spike_ledger() -> RequestLedger:
-    """Local SQLite request ledger for spikes (Postgres is used by the app from Phase 1)."""
+def repo_sqlite_url(url: str) -> str:
+    """Relative SQLite paths resolve from the repo root, not the caller's cwd."""
     OUT_DIR.mkdir(exist_ok=True)
-    url = str(spike_config()["ledger_url"])
     prefix = "sqlite:///"
     if url.startswith(prefix) and not url[len(prefix) :].startswith("/"):
-        # Relative SQLite paths resolve from the repo root, not the caller's cwd.
         url = prefix + str(REPO_ROOT / url[len(prefix) :])
-    return RequestLedger.from_url(url)
+    return url
+
+
+def spike_ledger() -> RequestLedger:
+    """Local SQLite request ledger for spikes (Postgres is used by the app from Phase 1)."""
+    return RequestLedger.from_url(repo_sqlite_url(str(spike_config()["ledger_url"])))
 
 
 def merchant_client(merchant_key: str, *, ledger: bool = True) -> PayPalClient:
@@ -137,8 +140,10 @@ def merchant_client(merchant_key: str, *, ledger: bool = True) -> PayPalClient:
     )
 
 
-def operator_client() -> PayPalClient:
-    return PayPalClient(operator_credentials(), http_settings(), ledger=spike_ledger())
+def operator_client(*, ledger: bool = True) -> PayPalClient:
+    return PayPalClient(
+        operator_credentials(), http_settings(), ledger=spike_ledger() if ledger else None
+    )
 
 
 def session_binding() -> tuple[str, str]:
