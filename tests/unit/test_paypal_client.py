@@ -132,3 +132,24 @@ def test_redact_masks_tokens_emails_and_names():
     assert out["payer"]["email_address"] == "b***@personal.example.com"
     assert out["payer"]["name"] == {"given_name": "J***", "surname": "D***"}
     assert out["links"][0]["href"] == "mailto:s***@example.com"
+
+
+def test_post_prefers_full_representation_get_does_not():
+    client, rec, _, _ = make([httpx.Response(201, json={}), httpx.Response(200, json={})])
+    client.post("/v2/checkout/orders", json={})
+    client.get("/v2/checkout/orders/1")
+    post, get = api_calls(rec)
+    assert post.headers["Prefer"] == "return=representation"
+    assert "Prefer" not in get.headers
+
+
+@pytest.mark.parametrize("status", [200, 201, 202, 204])
+def test_any_2xx_is_success(status):
+    client, _, _, _ = make([httpx.Response(status)])
+    assert client.post("/x").status_code == status
+
+
+def test_3xx_is_an_error():
+    client, _, _, _ = make([httpx.Response(302)])
+    with pytest.raises(PayPalError):
+        client.get("/x")

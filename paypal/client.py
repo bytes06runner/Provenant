@@ -3,8 +3,14 @@
 Responsibilities, and nothing more:
   * OAuth client-credentials token per REST app, cached until shortly before expiry
   * PayPal-Request-Id idempotency key on every POST (caller may pin one to retry safely)
+  * `Prefer: return=representation` on every POST, so responses carry the full resource
+  * Optional RequestLedger: every POST is persisted with its request id and resulting resource
+    id, and an operation the ledger already marks SUCCEEDED is never sent again
   * Retries with exponential backoff on 5xx and transport errors only
   * Structured errors carrying PayPal's name / issue codes and debug_id
+
+Success means any 2xx. Callers never branch on 200 vs 201; they read state from the resource
+(and verify it with a GET after every state change).
 """
 
 from __future__ import annotations
@@ -18,6 +24,7 @@ from typing import Any
 import httpx
 
 from paypal.config import Credentials, HttpSettings
+from paypal.ledger import LedgerEntry, OpState, RequestLedger
 
 
 @dataclass
@@ -63,6 +70,29 @@ class PayPalError(Exception):
         )
 
 
+class AlreadyCompleted(Exception):
+    """The ledger says this operation already succeeded; nothing was sent to PayPal.
+
+    Read current state with a GET on `entry.resource_id`.
+    """
+
+    def __init__(self, entry: LedgerEntry) -> None:
+        super().__init__(
+            f"operation {entry.operation_key!r} already succeeded: resource {entry.resource_id}"
+        )
+        self.entry = entry
+
+
+def resource_ref(body: Any) -> tuple[str | None, str | None]:
+    """(id, status) of the resource a POST created or changed, across Orders/Payments/Payouts."""
+    if not isinstance(body, dict):
+        return None, None
+    if isinstance(body.get("batch_header"), dict):
+        header = body["batch_header"]
+        return header.get("payout_batch_id"), header.get("batch_status")
+    return body.get("id"), body.get("status")
+
+
 @dataclass
 class PayPalResponse:
     status_code: int
@@ -70,6 +100,7 @@ class PayPalResponse:
     headers: httpx.Headers
     request_id: str | None
     debug_id: str | None
+    ledger_entry: LedgerEntry | None = None
 
 
 @dataclass
@@ -89,9 +120,11 @@ class PayPalClient:
         transport: httpx.BaseTransport | None = None,
         sleep: Callable[[float], None] = time.sleep,
         clock: Callable[[], float] = time.monotonic,
+        ledger: RequestLedger | None = None,
     ) -> None:
         self.credentials = credentials
         self.settings = settings
+        self.ledger = ledger
         self._sleep = sleep
         self._clock = clock
         self._token: _Token | None = None
@@ -159,15 +192,31 @@ class PayPalClient:
         json: Any = None,
         params: dict[str, Any] | None = None,
         request_id: str | None = None,
+        operation_key: str | None = None,
         extra_headers: dict[str, str] | None = None,
     ) -> PayPalResponse:
         method = method.upper()
         headers = {"Accept": "application/json"}
+        entry: LedgerEntry | None = None
         if method == "POST":
+            if self.ledger is not None:
+                if request_id is not None:
+                    raise ValueError("with a ledger, request ids come from the ledger")
+                entry = self.ledger.begin(
+                    operation_key or f"adhoc:{uuid.uuid4()}",
+                    self.credentials.label,
+                    method,
+                    path,
+                )
+                if entry.state is OpState.SUCCEEDED:
+                    raise AlreadyCompleted(entry)
+                request_id = entry.request_id
+                self.ledger.mark_attempt(entry.operation_key)
             # Same id on every retry, so a retried POST can never double-charge.
             request_id = request_id or str(uuid.uuid4())
             headers["PayPal-Request-Id"] = request_id
             headers["Content-Type"] = "application/json"
+            headers["Prefer"] = "return=representation"
         if extra_headers:
             headers.update(extra_headers)
 
@@ -181,25 +230,46 @@ class PayPalClient:
                 headers=headers,
             )
 
+        # A transport error that survives retries propagates and leaves the ledger entry
+        # PENDING: the outcome is unknown, and the next attempt reuses the same request id.
         resp = self._send_with_retry(send)
         if resp.status_code == 401 and self._token is not None:
             # Token revoked or expired early: refresh once and retry.
             self._token = None
             resp = self._send_with_retry(send)
-        if resp.status_code >= 400:
-            raise PayPalError.from_response(resp)
+        if not 200 <= resp.status_code < 300:
+            err = PayPalError.from_response(resp)
+            if entry is not None and self.ledger is not None:
+                self.ledger.fail(
+                    entry.operation_key,
+                    http_status=resp.status_code,
+                    error=f"{err.name}: {','.join(err.issues) or err.message}",
+                    debug_id=err.debug_id,
+                )
+            raise err
         body: Any = None
         if resp.content:
             try:
                 body = resp.json()
             except ValueError:
                 body = resp.text
+        debug_id = resp.headers.get("paypal-debug-id")
+        if entry is not None and self.ledger is not None:
+            rid, rstatus = resource_ref(body)
+            entry = self.ledger.succeed(
+                entry.operation_key,
+                http_status=resp.status_code,
+                resource_id=rid,
+                resource_status=rstatus,
+                debug_id=debug_id,
+            )
         return PayPalResponse(
             status_code=resp.status_code,
             body=body,
             headers=resp.headers,
             request_id=request_id,
-            debug_id=resp.headers.get("paypal-debug-id"),
+            debug_id=debug_id,
+            ledger_entry=entry,
         )
 
     def get(self, path: str, **kw: Any) -> PayPalResponse:
