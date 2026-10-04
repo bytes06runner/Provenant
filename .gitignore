@@ -14,3 +14,4 @@ eval/results/*
 spikes/out/
 *.egg-info/
 .DS_Store
+bin/
