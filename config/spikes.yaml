@@ -1,0 +1,19 @@
+# Parameters for the Phase 0 spike scripts in spikes/.
+# These are test inputs for proving PayPal behavior, not application data.
+
+merchant: northwind          # merchant key, maps to PAYPAL_MERCHANT_<KEY>_* in .env
+currency: USD
+item:
+  name: "Provenant spike item"
+  sku: "SPIKE-001"
+  unit_price: "12.50"
+  quantity: 2
+brand_name: "Provenant Spike"
+
+approval:
+  poll_interval_seconds: 3
+  timeout_seconds: 1800      # how long to wait for you to approve in the browser
+
+s2:
+  refund_fraction: "0.40"    # partial refund as a fraction of the captured amount
+  idempotent_repeats: 2      # extra calls with the same PayPal-Request-Id
