@@ -1,0 +1,26 @@
+# gitleaks config: the default ruleset plus rules for the secrets this project handles.
+title = "provenant"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "paypal-rest-client-secret"
+description = "PayPal REST app client secret assigned in env, YAML or code"
+regex = '''(?i)client_secret["']?\s*[:=]\s*["']?([A-Za-z0-9_\-]{40,})'''
+secretGroup = 1
+keywords = ["client_secret"]
+
+[[rules]]
+id = "paypal-rest-client-id"
+description = "PayPal REST app client id assigned in env, YAML or code"
+regex = '''(?i)client_id["']?\s*[:=]\s*["']?([AB][A-Za-z0-9_\-]{60,})'''
+secretGroup = 1
+keywords = ["client_id"]
+
+[[rules]]
+id = "paypal-oauth-access-token"
+description = "PayPal OAuth access token"
+regex = '''\b(A21AA[A-Za-z0-9_\-]{40,})'''
+secretGroup = 1
+keywords = ["a21aa"]
