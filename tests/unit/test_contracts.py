@@ -322,7 +322,15 @@ def test_all_violations_are_reported_not_just_the_first(world):
         shipping_address=untrusted(ELSEWHERE, PAGE),
     )
     result = run(world, bad, vm, mf)
-    assert result.blocked_fields() == {Field.PAYEE, Field.QUANTITY, Field.SHIPPING_ADDRESS}
+    # The attacker payee also unbinds the honest sku, price and total (different manifest).
+    assert result.blocked_fields() == {
+        Field.PAYEE,
+        Field.QUANTITY,
+        Field.SHIPPING_ADDRESS,
+        Field.SKU,
+        Field.UNIT_PRICE,
+        Field.AMOUNT_TOTAL,
+    }
 
 
 def test_violations_carry_the_provenance_path(world):
@@ -354,3 +362,98 @@ def test_mandate_naming_a_missing_vault_entry_is_blocked(world):
         mf,
     )
     assert result.rules_for(Field.SHIPPING_ADDRESS) == {Rule.WRONG_SOURCE, Rule.VALUE_MISMATCH}
+
+
+# ---- cross-field binding: sku, price and total must share the payee's manifest -------
+
+
+def attacker_total(attacker: VerifiedManifest, vm: VerifiedMandate) -> Labeled[Decimal]:
+    return derive(
+        compute_total,
+        attacker.unit_price(SKU),
+        vm.quantity(),
+        attacker.shipping_flat(),
+        attacker.tax_rate(),
+    )
+
+
+@pytest.mark.parametrize("f", [Field.SKU, Field.UNIT_PRICE, Field.AMOUNT_TOTAL])
+def test_attacker_signed_field_with_legit_payee_is_blocked(world, f):
+    vm, mf, attacker = world.mandate(), world.manifest(), world.manifest("attacker")
+    poisoned = {
+        Field.SKU: attacker.sku(SKU),
+        Field.UNIT_PRICE: attacker.unit_price(SKU),
+        Field.AMOUNT_TOTAL: attacker_total(attacker, vm),
+    }[f]
+    result = run(world, with_field(honest(world, vm, mf), f, poisoned), vm, mf)
+    assert Rule.MANIFEST_DIFFERS_FROM_PAYEE in result.rules_for(f)
+    assert Field.PAYEE not in result.blocked_fields()
+
+
+def test_attacker_price_sku_and_total_together_with_legit_payee_are_blocked(world):
+    vm, mf, attacker = world.mandate(), world.manifest(), world.manifest("attacker")
+    bad = dataclasses.replace(
+        honest(world, vm, mf),
+        sku=attacker.sku(SKU),
+        unit_price=attacker.unit_price(SKU),
+        amount_total=attacker_total(attacker, vm),
+    )
+    result = run(world, bad, vm, mf)
+    for f in (Field.SKU, Field.UNIT_PRICE, Field.AMOUNT_TOTAL):
+        assert Rule.MANIFEST_DIFFERS_FROM_PAYEE in result.rules_for(f)
+
+
+def test_attacker_payee_with_legit_price_sku_and_total_is_blocked(world):
+    """The reverse: honest item and price, money redirected to the attacker."""
+    vm, mf, attacker = world.mandate(), world.manifest(), world.manifest("attacker")
+    result = run(world, with_field(honest(world, vm, mf), Field.PAYEE, attacker.payee()), vm, mf)
+    assert {Rule.WRONG_SOURCE, Rule.VALUE_MISMATCH} <= result.rules_for(Field.PAYEE)
+    for f in (Field.SKU, Field.UNIT_PRICE, Field.AMOUNT_TOTAL):
+        assert result.rules_for(f) == {Rule.MANIFEST_DIFFERS_FROM_PAYEE}
+
+
+def test_fully_consistent_attacker_checkout_against_honest_selection_is_blocked(world):
+    """Everything from the attacker's manifest, while the plan selected the honest merchant."""
+    vm, mf, attacker = world.mandate(), world.manifest(), world.manifest("attacker")
+    result = run(world, honest(world, vm, attacker), vm, mf)
+    assert not result.allowed
+    assert Rule.WRONG_SOURCE in result.rules_for(Field.PAYEE)
+
+
+def test_stale_manifest_of_same_merchant_cannot_supply_the_price(world):
+    """Same merchant, older validly signed manifest (cheaper price): different hash, blocked."""
+    vm = world.mandate()
+    old = world.manifest(version=1)
+    current = world.manifest(version=2, issued_at="2026-10-03T00:00:00Z")
+    assert old.hash != current.hash
+    result = run(
+        world,
+        with_field(honest(world, vm, current), Field.UNIT_PRICE, old.unit_price(SKU)),
+        vm,
+        current,
+    )
+    assert Rule.MANIFEST_DIFFERS_FROM_PAYEE in result.rules_for(Field.UNIT_PRICE)
+
+
+def test_payee_backed_by_two_manifests_is_blocked(world):
+    vm, mf, attacker = world.mandate(), world.manifest(), world.manifest("attacker")
+    two = derive(lambda a, _b: a, mf.payee(), attacker.payee())
+    result = run(world, with_field(honest(world, vm, mf), Field.PAYEE, two), vm, mf)
+    assert Rule.MANIFEST_DIFFERS_FROM_PAYEE in result.rules_for(Field.PAYEE)
+
+
+@pytest.mark.parametrize("mismatch", ["ref", "digest"])
+def test_binding_checks_both_manifest_ref_and_hash(world, mismatch):
+    """Defense in depth against a minting bug: a source whose ref and digest disagree with the
+    payee's manifest in only one of the two must still be refused."""
+    from lineage.labels import MINT, mint_merchant_signed
+
+    vm, mf, attacker = world.mandate(), world.manifest(), world.manifest("attacker")
+    ref, digest = mf.ref, mf.hash
+    if mismatch == "ref":
+        ref = attacker.ref
+    else:
+        digest = attacker.hash
+    price = mint_merchant_signed(MINT, Decimal("99.00"), ref, f"catalog[{SKU}].price", digest)
+    result = run(world, with_field(honest(world, vm, mf), Field.UNIT_PRICE, price), vm, mf)
+    assert Rule.MANIFEST_DIFFERS_FROM_PAYEE in result.rules_for(Field.UNIT_PRICE)

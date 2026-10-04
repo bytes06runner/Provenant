@@ -10,6 +10,10 @@
   shipping_address  USER, the vault entry the mandate names; == that entry
   currency          USER or MERCHANT_SIGNED; mandate and manifest must agree
 
+Cross-field binding: every MERCHANT_SIGNED source behind item.sku, unit_price and amount.total
+must be the same manifest (same hash) that the payee came from. Money can only go to a payee
+whose own signed manifest also stands behind the item and the price.
+
 Any UNTRUSTED label, or any UNTRUSTED source, in one of these fields is a hard block whatever
 the value is: provenance wins over content. The checker never stops at the first problem; it
 returns every violation with the provenance that caused it, for the Provenance Graph and the
@@ -59,6 +63,7 @@ class Rule(StrEnum):
     OVER_MAX_TOTAL = "over_max_total"
     CURRENCY_DISAGREES = "currency_disagrees"
     MANDATE_EXPIRED = "mandate_expired"
+    MANIFEST_DIFFERS_FROM_PAYEE = "manifest_differs_from_payee"
 
 
 @dataclass(frozen=True)
@@ -321,6 +326,40 @@ class _Checker:
                 v,
             )
 
+    def check_same_manifest_as_payee(self) -> None:
+        payee = self.c.payee
+        if any(s.kind is Label.UNTRUSTED for s in payee.sources):
+            return  # already a hard block on the payee; there is no trusted manifest to bind to
+        anchors = {(s.ref, s.digest) for s in payee.sources if s.kind is Label.MERCHANT_SIGNED}
+        if len(anchors) != 1:
+            self.flag(
+                Field.PAYEE,
+                Rule.MANIFEST_DIFFERS_FROM_PAYEE,
+                f"payee must come from exactly one signed manifest, found {len(anchors)}",
+                payee,
+            )
+            return
+        ((anchor_ref, anchor_hash),) = anchors
+        bound = [
+            (Field.SKU, self.c.sku),
+            (Field.UNIT_PRICE, self.c.unit_price),
+            (Field.AMOUNT_TOTAL, self.c.amount_total),
+        ]
+        for f, value in bound:
+            foreign = sorted(
+                s.describe()
+                for s in value.sources
+                if s.kind is Label.MERCHANT_SIGNED
+                and (s.ref != anchor_ref or s.digest != anchor_hash)
+            )
+            if foreign:
+                self.flag(
+                    f,
+                    Rule.MANIFEST_DIFFERS_FROM_PAYEE,
+                    f"signed by {foreign}, but the payee comes from manifest {anchor_hash[:16]}",
+                    value,
+                )
+
     def run(self, now: datetime) -> ContractResult:
         if now >= self.m.expires_at:
             self.flag(Field.MANDATE, Rule.MANDATE_EXPIRED, f"expired at {self.m.expires_at}")
@@ -331,6 +370,7 @@ class _Checker:
         self.check_amount_total(sku)
         self.check_shipping_address()
         self.check_currency()
+        self.check_same_manifest_as_payee()
         return ContractResult(tuple(self.violations))
 
 
