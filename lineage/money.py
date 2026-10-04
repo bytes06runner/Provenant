@@ -7,6 +7,7 @@ from decimal import Decimal
 
 _AMOUNT = re.compile(r"^(0|[1-9][0-9]{0,11})(\.[0-9]{1,2})?$")
 _CURRENCY = re.compile(r"^[A-Z]{3}$")
+_FRACTION = re.compile(r"^(0(\.[0-9]{1,6})?|1(\.0{1,6})?)$")
 
 
 class MoneyError(ValueError):
@@ -17,6 +18,13 @@ def parse_amount(text: str) -> Decimal:
     """Non-negative amount with at most two decimals, as PayPal accepts it ("12.50")."""
     if not isinstance(text, str) or not _AMOUNT.match(text):
         raise MoneyError(f"invalid amount {text!r}: expected a decimal string like '12.50'")
+    return Decimal(text)
+
+
+def parse_fraction(text: str) -> Decimal:
+    """A rate between 0 and 1 with up to six decimals ("0.0825" for 8.25 percent)."""
+    if not isinstance(text, str) or not _FRACTION.match(text):
+        raise MoneyError(f"invalid fraction {text!r}: expected a decimal string from 0 to 1")
     return Decimal(text)
 
 

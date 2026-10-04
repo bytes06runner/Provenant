@@ -200,3 +200,18 @@ def test_money_helpers():
             parse_amount(bad)
     with pytest.raises(MoneyError):
         parse_currency("US")
+
+
+@pytest.mark.parametrize("ok", ["0", "0.0825", "0.5", "1", "1.000000", "0.000001"])
+def test_fraction_accepts_rates(ok):
+    from lineage.money import parse_fraction
+
+    assert Decimal("0") <= parse_fraction(ok) <= Decimal("1")
+
+
+@pytest.mark.parametrize("bad", ["1.5", "1.01", "-0.1", "0.1234567", ".5", "", "2"])
+def test_fraction_rejects_out_of_range(bad):
+    from lineage.money import MoneyError, parse_fraction
+
+    with pytest.raises(MoneyError):
+        parse_fraction(bad)

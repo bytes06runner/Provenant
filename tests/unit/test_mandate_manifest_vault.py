@@ -255,3 +255,15 @@ def test_validly_signed_but_malformed_manifest_rejected(world):
     env = sign("provenant/manifest/v1", payload, world.honest_key)
     with pytest.raises(ManifestError, match="invalid manifest"):
         verify_manifest(env, merchant_id="northwind", registry=world.registry)
+
+
+def test_tax_rate_with_four_decimals_is_valid(world):
+    assert world.manifest(tax_rate="0.0825").tax_rate().value == Decimal("0.0825")
+
+
+@pytest.mark.parametrize("fee", ["1.5", "0.1234567"])
+def test_restocking_fee_must_be_a_fraction(fee):
+    payload = manifest_payload("northwind", "NWPAYEE123")
+    payload["policy"] = {**payload["policy"], "restocking_fee": fee}
+    with pytest.raises(ValueError):
+        MerchantManifest(**payload)

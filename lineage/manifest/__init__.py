@@ -17,7 +17,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey,
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from lineage.labels import MINT, Labeled, mint_merchant_signed
-from lineage.money import parse_amount, parse_currency
+from lineage.money import parse_amount, parse_currency, parse_fraction
 from lineage.signing import SignatureError, SignedEnvelope, sign, verify
 
 PURPOSE = "provenant/manifest/v1"
@@ -59,8 +59,7 @@ class RefundCaps(BaseModel):
     @field_validator("fulfillment_fault", "misrepresentation", "decision_fault")
     @classmethod
     def _fraction(cls, v: str) -> str:
-        if not Decimal("0") <= parse_amount(v) <= Decimal("1"):
-            raise ValueError("refund cap must be a fraction between 0 and 1")
+        parse_fraction(v)
         return v
 
 
@@ -71,6 +70,12 @@ class Policy(BaseModel):
     refund_caps: RefundCaps
     restocking_fee: str = "0.00"  # fraction
     partial_refunds_preauthorized: bool = False
+
+    @field_validator("restocking_fee")
+    @classmethod
+    def _fee(cls, v: str) -> str:
+        parse_fraction(v)
+        return v
 
 
 class MerchantManifest(BaseModel):
@@ -87,10 +92,16 @@ class MerchantManifest(BaseModel):
     catalog: list[Product] = Field(min_length=1)
     policy: Policy
 
-    @field_validator("shipping_flat", "tax_rate")
+    @field_validator("shipping_flat")
     @classmethod
     def _amounts(cls, v: str) -> str:
         parse_amount(v)
+        return v
+
+    @field_validator("tax_rate")
+    @classmethod
+    def _rate(cls, v: str) -> str:
+        parse_fraction(v)
         return v
 
     @field_validator("currency")
@@ -158,7 +169,7 @@ class VerifiedManifest:
         return self._field(parse_amount(self.manifest.shipping_flat), "shipping_flat")
 
     def tax_rate(self) -> Labeled[Decimal]:
-        return self._field(parse_amount(self.manifest.tax_rate), "tax_rate")
+        return self._field(parse_fraction(self.manifest.tax_rate), "tax_rate")
 
 
 class MerchantKeyRegistry:
