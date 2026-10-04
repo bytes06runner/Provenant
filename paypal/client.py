@@ -176,6 +176,25 @@ class PayPalClient:
         self._token = _Token(value=body["access_token"], expires_at=now + max(ttl, 0))
         return self._token.value
 
+    def browser_client_token(self, domains: list[str]) -> str:
+        """Short-lived, browser-safe token for initializing JS SDK v6. Never log it."""
+        resp = self._send_with_retry(
+            lambda: self._http.post(
+                "/v1/oauth2/token",
+                data={
+                    "grant_type": "client_credentials",
+                    "response_type": "client_token",
+                    # PayPal rejects localhost/IPs as invalid_domain; pass [] for local runs.
+                    **({"domains[]": ",".join(domains)} if domains else {}),
+                },
+                auth=(self.credentials.client_id, self.credentials.client_secret),
+                headers={"Accept": "application/json"},
+            )
+        )
+        if resp.status_code != 200:
+            raise PayPalError.from_response(resp)
+        return str(resp.json()["access_token"])
+
     # ---- Core request ----------------------------------------------------
 
     def _send_with_retry(self, send: Callable[[], httpx.Response]) -> httpx.Response:
