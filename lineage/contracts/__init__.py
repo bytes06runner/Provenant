@@ -99,9 +99,23 @@ class Violation:
     provenance: tuple[str, ...] = ()
 
 
+_SEAL = object()  # only check_checkout() can produce a sealed result
+
+
 @dataclass(frozen=True)
 class ContractResult:
+    """Outcome of check_checkout(). A sealed, allowed result is the only input the checkout
+    builder accepts, and it carries the exact checkout and manifest that were approved."""
+
     violations: tuple[Violation, ...] = field(default_factory=tuple)
+    checkout: ProposedCheckout | None = None
+    manifest_hash: str = ""
+    mandate_hash: str = ""
+    _seal: object | None = field(default=None, repr=False, compare=False)
+
+    @property
+    def sealed(self) -> bool:
+        return self._seal is _SEAL
 
     @property
     def allowed(self) -> bool:
@@ -371,7 +385,13 @@ class _Checker:
         self.check_shipping_address()
         self.check_currency()
         self.check_same_manifest_as_payee()
-        return ContractResult(tuple(self.violations))
+        return ContractResult(
+            tuple(self.violations),
+            self.c,
+            self.manifest.hash,
+            self.mandate.envelope.payload_hash,
+            _SEAL,
+        )
 
 
 def check_checkout(
