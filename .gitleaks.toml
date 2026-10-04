@@ -24,3 +24,10 @@ description = "PayPal OAuth access token"
 regex = '''\b(A21AA[A-Za-z0-9_\-]{40,})'''
 secretGroup = 1
 keywords = ["a21aa"]
+
+# The generic-api-key rule matches type annotations such as `user_key: Ed25519PrivateKey`.
+# Only that exact class name is allowed; any real key material is still reported.
+[[allowlists]]
+description = "Ed25519PrivateKey type name, not key material"
+regexTarget = "secret"
+regexes = ['''^Ed25519(Private|Public)Key$''']
