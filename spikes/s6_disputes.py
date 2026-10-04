@@ -103,7 +103,8 @@ def run_step(client: PayPalClient, spike: Spike, step: str, dispute_id: str, out
     base = f"/v1/customer/disputes/{dispute_id}"
     before = snapshot(client, spike, dispute_id, "before")
     s = summarize(before)
-    key = f"s6:{dispute_id}:{step}"
+    # Stage is part of the operation: evidence in INQUIRY and again in CHARGEBACK are distinct.
+    key = f"s6:{dispute_id}:{s['stage']}:{step}"
     rel = REQUIRED_LINK.get(step)
     if rel is not None and rel not in s["actions"]:
         spike.check(f"{step}: dispute offers the {rel!r} link", False, f"offered: {s['actions']}")
