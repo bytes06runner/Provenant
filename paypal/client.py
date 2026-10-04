@@ -45,6 +45,18 @@ class PayPalError(Exception):
             f"name={self.name} issues={issues} debug_id={self.debug_id}: {self.message}"
         )
 
+    def summary(self) -> str:
+        """Short, never-empty description for ledgers and logs.
+
+        PayPal sometimes answers with no body at all (seen: 403 for an unsupported
+        PayPal-Mock-Response code), so fall back to the HTTP status.
+        """
+        name = self.name or f"HTTP {self.status_code}"
+        detail = ",".join(self.issues) or self.message
+        if detail:
+            return f"{name}: {detail}"
+        return f"{name}, empty body" if self.body in ("", None) else name
+
     @classmethod
     def from_response(cls, resp: httpx.Response) -> PayPalError:
         try:
@@ -243,7 +255,7 @@ class PayPalClient:
                 self.ledger.fail(
                     entry.operation_key,
                     http_status=resp.status_code,
-                    error=f"{err.name}: {','.join(err.issues) or err.message}",
+                    error=err.summary(),
                     debug_id=err.debug_id,
                 )
             raise err

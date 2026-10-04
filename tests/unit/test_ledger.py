@@ -137,3 +137,10 @@ def test_pinned_request_id_rejected_with_ledger(ledger):
     client, _ = client_with(ledger, lambda r: httpx.Response(201, json={}))
     with pytest.raises(ValueError):
         client.post("/x", json={}, request_id="mine")
+
+
+def test_empty_error_body_still_recorded_meaningfully(ledger):
+    client, _ = client_with(ledger, lambda r: httpx.Response(403))
+    with pytest.raises(PayPalError):
+        client.post("/x", json={}, operation_key="op")
+    assert ledger.get("op").error == "HTTP 403, empty body"
