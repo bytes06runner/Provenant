@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Provenant S8</title>
+  <style>
+    :root { --bg: #f7f7f5; --fg: #1d1d1b; --muted: #6b6b66; --line: #e2e2dc; --ok: #1f7a4d; --bad: #b3261e; }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #161615; --fg: #ececea; --muted: #a3a39d; --line: #2e2e2b; --ok: #5cc48d; --bad: #f2867f; }
+    }
+    body { margin: 0; background: var(--bg); color: var(--fg);
+           font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    main { max-width: 520px; margin: 48px auto; padding: 0 16px; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    p.sub { color: var(--muted); margin: 0 0 24px; }
+    .card { border: 1px solid var(--line); border-radius: 10px; padding: 20px; }
+    #log { margin-top: 20px; font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+           white-space: pre-wrap; color: var(--muted); }
+    .ok { color: var(--ok); } .bad { color: var(--bad); }
+  </style>
+  <script src="{{SDK_SCRIPT_URL}}" async onload="init()"></script>
+</head>
+<body>
+<main>
+  <h1>Spike S8: JS SDK v6 approval</h1>
+  <p class="sub">Approves a server-created AUTHORIZE order. Pay with a sandbox buyer account.</p>
+  <div class="card">
+    <paypal-button type="pay" hidden></paypal-button>
+    <div id="log">Loading PayPal SDK...</div>
+  </div>
+</main>
+<script>
+  const logEl = document.getElementById("log");
+  function log(msg, cls) {
+    const line = document.createElement("div");
+    if (cls) line.className = cls;
+    line.textContent = msg;
+    logEl.appendChild(line);
+  }
+
+  async function post(url, body) {
+    const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" },
+                                   body: JSON.stringify(body || {}) });
+    if (!res.ok) throw new Error(`${url} failed: ${res.status} ${await res.text()}`);
+    return res.json();
+  }
+
+  async function createOrder() {
+    const { orderId } = await post("/api/orders");
+    log(`Server created order ${orderId}`);
+    return { orderId };
+  }
+
+  async function init() {
+    logEl.textContent = "";
+    try {
+      const tokenRes = await fetch("/api/client-token");
+      if (!tokenRes.ok) throw new Error(`client token failed: ${tokenRes.status} ${await tokenRes.text()}`);
+      const { clientToken } = await tokenRes.json();
+      log("Client token received");
+      const sdk = await window.paypal.createInstance({
+        clientToken,
+        components: ["paypal-payments"],
+        pageType: "checkout",
+      });
+      const methods = await sdk.findEligibleMethods({ currencyCode: "USD" });
+      if (!methods.isEligible("paypal")) { log("PayPal not eligible for this session", "bad"); return; }
+
+      const session = sdk.createPayPalOneTimePaymentSession({
+        async onApprove(data) {
+          log(`onApprove: order ${data.orderId}. Authorizing on the server...`);
+          try {
+            const r = await post(`/api/orders/${data.orderId}/authorize`);
+            log(`Authorization ${r.authorizationId}: ${r.authorizationStatus}, expires ${r.expirationTime}`);
+            log(`S8 ${r.result}`, r.result === "PASS" ? "ok" : "bad");
+          } catch (e) { log(String(e), "bad"); }
+        },
+        onCancel(data) { log("Buyer cancelled"); post("/api/events/cancel", data || {}); },
+        onError(err) { log(`SDK error: ${err}`, "bad"); post("/api/events/error", { message: String(err) }); },
+      });
+
+      const button = document.querySelector("paypal-button");
+      button.removeAttribute("hidden");
+      button.addEventListener("click", async () => {
+        try {
+          // The order promise must be passed straight away so popup blockers allow the window.
+          await session.start({ presentationMode: "{{PRESENTATION_MODE}}" }, createOrder());
+        } catch (e) { log(`start() failed: ${e}`, "bad"); }
+      });
+      log("Ready. Click the PayPal button.");
+    } catch (e) {
+      log(`Init failed: ${e}`, "bad");
+    }
+  }
+</script>
+</body>
+</html>

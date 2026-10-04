@@ -151,7 +151,19 @@ def session_binding() -> tuple[str, str]:
     return custom_id, f"pv-spike-{uuid.uuid4().hex}"
 
 
-def order_body(cfg: dict[str, Any], custom_id: str, invoice_id: str) -> dict[str, Any]:
+def order_body(
+    cfg: dict[str, Any], custom_id: str, invoice_id: str, *, redirect: bool = True
+) -> dict[str, Any]:
+    """AUTHORIZE order from spike config. redirect=False omits return/cancel URLs, for the
+    JS SDK flow where approval happens in a PayPal popup or overlay instead of a redirect."""
+    experience: dict[str, Any] = {
+        "brand_name": cfg["brand_name"],
+        "shipping_preference": "NO_SHIPPING",
+        "user_action": "CONTINUE",
+    }
+    if redirect:
+        experience["return_url"] = require_env("PAYPAL_RETURN_URL")
+        experience["cancel_url"] = require_env("PAYPAL_CANCEL_URL")
     currency = cfg["currency"]
     item = cfg["item"]
     unit = Decimal(str(item["unit_price"]))
@@ -180,17 +192,7 @@ def order_body(cfg: dict[str, Any], custom_id: str, invoice_id: str) -> dict[str
                 ],
             }
         ],
-        "payment_source": {
-            "paypal": {
-                "experience_context": {
-                    "brand_name": cfg["brand_name"],
-                    "shipping_preference": "NO_SHIPPING",
-                    "user_action": "CONTINUE",
-                    "return_url": require_env("PAYPAL_RETURN_URL"),
-                    "cancel_url": require_env("PAYPAL_CANCEL_URL"),
-                }
-            }
-        },
+        "payment_source": {"paypal": {"experience_context": experience}},
     }
 
 

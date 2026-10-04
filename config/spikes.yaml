@@ -45,3 +45,13 @@ s7:
     authorize: [INSTRUMENT_DECLINED, TRANSACTION_REFUSED, PAYER_ACCOUNT_RESTRICTED]
     capture: [TRANSACTION_REFUSED, AUTHORIZATION_EXPIRED, DECLINED_DUE_TO_RELATED_TXN]
     refund: [TRANSACTION_REFUSED, CAPTURE_FULLY_REFUNDED, REFUND_FAILED_INSUFFICIENT_FUNDS]
+
+s8:
+  # Local test page for JS SDK v6 approval of a server-created AUTHORIZE order.
+  host: "127.0.0.1"
+  port: 8708
+  sdk_script_url: "https://www.sandbox.paypal.com/web-sdk/v6/core"
+  # Domains the browser client token is bound to. PayPal rejects localhost and IPs
+  # (invalid_domain), so this stays empty locally; set the public domain once deployed.
+  client_token_domains: []
+  presentation_mode: "auto"

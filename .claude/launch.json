@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "s8-jssdk",
+      "runtimeExecutable": ".venv/bin/python",
+      "runtimeArgs": ["spikes/s8_jssdk/server.py"],
+      "port": 8708,
+      "url": "http://localhost:8708"
+    }
+  ]
+}
