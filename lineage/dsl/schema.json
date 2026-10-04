@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://provenant.dev/schemas/plan/v1",
+  "title": "Provenant plan",
+  "description": "A plan emitted by the P-LLM planner. The planner sees only the confirmed mandate and the tool signatures, never web content. The interpreter executes it with provenance labels.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "body"],
+  "properties": {
+    "version": {"const": 1},
+    "body": {"$ref": "#/$defs/block"}
+  },
+  "$defs": {
+    "name": {"type": "string", "pattern": "^[a-z_][a-z0-9_]{0,31}$"},
+    "block": {"type": "array", "items": {"$ref": "#/$defs/stmt"}, "maxItems": 64},
+    "stmt": {
+      "oneOf": [
+        {"$ref": "#/$defs/let"},
+        {"$ref": "#/$defs/if"},
+        {"$ref": "#/$defs/for_each"},
+        {"$ref": "#/$defs/propose_checkout"}
+      ]
+    },
+    "let": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "name", "expr"],
+      "properties": {
+        "op": {"const": "let"},
+        "name": {"$ref": "#/$defs/name"},
+        "expr": {"$ref": "#/$defs/expr"}
+      }
+    },
+    "if": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "cond", "then"],
+      "properties": {
+        "op": {"const": "if"},
+        "cond": {"$ref": "#/$defs/expr"},
+        "then": {"$ref": "#/$defs/block"},
+        "else": {"$ref": "#/$defs/block"}
+      }
+    },
+    "for_each": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "var", "in", "body"],
+      "properties": {
+        "op": {"const": "for_each"},
+        "var": {"$ref": "#/$defs/name"},
+        "in": {"$ref": "#/$defs/expr"},
+        "body": {"$ref": "#/$defs/block"},
+        "collect": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["into", "expr"],
+          "properties": {
+            "into": {"$ref": "#/$defs/name"},
+            "expr": {"$ref": "#/$defs/expr"},
+            "flatten": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "propose_checkout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op", "selection"],
+      "properties": {
+        "op": {"const": "propose_checkout"},
+        "selection": {"$ref": "#/$defs/expr"}
+      }
+    },
+    "expr": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["var"],
+          "properties": {"var": {"$ref": "#/$defs/name"}}
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["const"],
+          "properties": {
+            "const": {"type": ["string", "integer", "boolean", "null"]}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["call", "args"],
+          "properties": {
+            "call": {
+              "enum": [
+                "list_merchants",
+                "fetch_manifest",
+                "search_manifest",
+                "fetch_page",
+                "extract",
+                "rank",
+                "precheck"
+              ]
+            },
+            "args": {
+              "type": "object",
+              "maxProperties": 8,
+              "propertyNames": {"$ref": "#/$defs/name"},
+              "additionalProperties": {"$ref": "#/$defs/expr"}
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["select_best"],
+          "properties": {
+            "select_best": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["from", "ranking"],
+              "properties": {
+                "from": {"$ref": "#/$defs/expr"},
+                "ranking": {"$ref": "#/$defs/expr"}
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}
