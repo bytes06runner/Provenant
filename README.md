@@ -84,7 +84,7 @@ All proven against `api-m.sandbox.paypal.com`, with redacted request and respons
 | S2 | Void an authorization; repeat a partial refund 3 times with one `PayPal-Request-Id` and get exactly one refund | PASS |
 | S3 | Liability payout from the operator account to two buyers; our ledger refuses a duplicate payout without calling PayPal | PASS 8/8 |
 | S7 | Negative testing with `PayPal-Mock-Response` on create, authorize, capture and refund; failures never corrupt the ledger or the resource | PASS 35/35 |
-| S8 | JS SDK v6 button approves a server-created `AUTHORIZE` order | Page built, awaiting buyer run |
+| S8 | JS SDK v6 button approves a server-created `AUTHORIZE` order; authorized and verified server-side | PASS 8/8 |
 | S4, S5, S6 | Vaulted autonomous checkout, webhooks over a cloudflared tunnel, dispute lifecycle | Next |
 
 ### Payment safety built in from day one
