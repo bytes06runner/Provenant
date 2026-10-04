@@ -14,6 +14,8 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "fastapi>=0.115",
     "uvicorn>=0.30",
+    "cryptography>=43",
+    "rfc8785>=0.1.4",
 ]
 
 [project.optional-dependencies]
@@ -23,6 +25,7 @@ dev = [
     "mypy>=1.11",
     "types-PyYAML",
     "pre-commit>=3.7",
+    "hypothesis>=6.100",
 ]
 
 [build-system]
@@ -54,4 +57,4 @@ addopts = "-m 'not sandbox'"
 [tool.mypy]
 python_version = "3.12"
 strict = true
-packages = ["paypal"]
+packages = ["paypal", "lineage"]
