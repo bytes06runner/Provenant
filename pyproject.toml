@@ -1,0 +1,53 @@
+[project]
+name = "provenant"
+version = "0.0.1"
+description = "A trust layer for AI agents that spend money: provenance-checked checkout and causal recourse on PayPal rails."
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.27",
+    "pydantic>=2.7",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "types-PyYAML",
+    "pre-commit>=3.7",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["api", "lineage", "blackbox", "paypal", "llm", "merchants", "baseline", "lab", "eval"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S"]
+ignore = ["S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106"]
+"spikes/**" = ["S311"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "sandbox: hits the real PayPal sandbox (needs credentials in .env)",
+]
+addopts = "-m 'not sandbox'"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["paypal"]

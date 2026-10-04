@@ -1,0 +1,29 @@
+# Application config. Secrets never live here; they come from .env.
+
+paypal:
+  http:
+    timeout_seconds: 30
+    max_retries: 3            # retries on 5xx and transport errors only
+    backoff_base_seconds: 0.5 # exponential: base * 2**attempt
+    backoff_max_seconds: 8
+  oauth:
+    token_refresh_margin_seconds: 120  # refresh this long before expires_in
+  authorization:
+    honor_period_days: 3
+    valid_days: 29
+  custom_id:
+    prefix: "pv:"
+    hash_hex_chars: 32
+    max_length: 127
+
+recorder:
+  hash_algorithm: sha256
+
+remedy:
+  auto_remedy_env: AUTO_REMEDY
+
+attribution:
+  samples_per_coalition: 8
+  bootstrap_resamples: 2000
+  ci_level: 0.95
+  max_ci_width_for_auto: 0.35
