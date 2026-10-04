@@ -95,6 +95,7 @@ class Spike:
                     "log": self.log,
                 },
                 indent=2,
+                default=str,  # never lose a spike log to an unserializable value
             )
         )
         print(f"\n=== {self.name}: {'PASS' if passed else 'FAIL'}  (redacted log: {path})")

@@ -204,7 +204,7 @@ def main() -> int:
 
     store = WebhookStore(create_engine(repo_sqlite_url(cfg["s5"]["store_url"])))
     dispute_events = [
-        (e["received_at"], e["event_type"], e["event_id"])
+        (e["received_at"].isoformat(), e["event_type"], e["event_id"])
         for e in store.events()
         if e["event_type"].startswith("CUSTOMER.DISPUTE") and e["resource_id"] == args.dispute_id
     ]
