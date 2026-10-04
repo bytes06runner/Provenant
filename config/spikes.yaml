@@ -20,3 +20,28 @@ approval:
 s2:
   refund_fraction: "0.40"    # partial refund as a fraction of the captured amount
   idempotent_repeats: 2      # extra calls with the same PayPal-Request-Id
+
+s3:
+  # Liability-pool payout from the operator account to each sandbox buyer.
+  receiver_envs: [PAYPAL_BUYER_A_EMAIL, PAYPAL_BUYER_B_EMAIL]
+  amount: "3.00"
+  email_subject: "Provenant spike payout"
+  note: "Provenant spike S3 liability payout"
+  poll_interval_seconds: 5
+  timeout_seconds: 300
+  terminal_batch_statuses: [SUCCESS, DENIED, CANCELED]
+
+s7:
+  # Negative testing via the PayPal-Mock-Response header. Each case targets a resource whose
+  # real (unmocked) outcome is a different error, so "mock honored" is unambiguous and no
+  # money can move even if PayPal ignores the header.
+  #   create_order:   fresh invoice id, so a real call would succeed (unapproved, harmless)
+  #   authorize:      fresh unapproved order, real error would be ORDER_NOT_APPROVED
+  #   capture:        an already voided authorization, real error would be AUTHORIZATION_VOIDED
+  #   refund:         amount far above the capture, real error would be REFUND_AMOUNT_EXCEEDED
+  refund_amount_multiplier: 100
+  cases:
+    create_order: [DUPLICATE_INVOICE_ID, INTERNAL_SERVER_ERROR]
+    authorize: [INSTRUMENT_DECLINED, TRANSACTION_REFUSED, PAYER_ACCOUNT_RESTRICTED]
+    capture: [TRANSACTION_REFUSED, AUTHORIZATION_EXPIRED, DECLINED_DUE_TO_RELATED_TXN]
+    refund: [TRANSACTION_REFUSED, CAPTURE_FULLY_REFUNDED, REFUND_FAILED_INSUFFICIENT_FUNDS]
