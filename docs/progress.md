@@ -25,7 +25,7 @@
 | S7 | PASS (35/35) | 9 of 11 mock codes honored across create, authorize, capture, refund; 2 unsupported. |
 | S4, S6 | Waiting on you | Vault enabled on merchant apps (S4); a sandbox dispute filed (S6). |
 | S5 | Not started | Will use a cloudflared tunnel. |
-| S8 | Not started | After S3 and S7. |
+| S8 | In progress | Test page built; SDK v6 initializes and renders the button. Waiting for a buyer run. |
 
 #### S0: OAuth and scopes (2026-10-04)
 All apps: `refund`, `payments/payouts`, `disputes/read-seller`, `disputes/update-seller`,
@@ -137,6 +137,15 @@ Findings:
 - Mocked 4xx responses share a fixed `debug_id` (`70c28ae654da`). Never treat debug ids as unique.
 - Bug found and fixed: an empty error body produced the ledger error `None: None`. `PayPalError`
   now has a never-empty `summary()` (`HTTP 403, empty body`), covered by a unit test.
+
+#### S8: JS SDK v6 (2026-10-04, in progress)
+Test page: `spikes/s8_jssdk/` (FastAPI server on `localhost:8708`, launch config in `.claude/launch.json`).
+- Browser client token: `POST /v1/oauth2/token` with `response_type=client_token`. Passing
+  `domains[]=localhost,127.0.0.1` fails with 401 `invalid_domain: Domain format not valid`; with no
+  domains PayPal issues the token. Local runs send none; the deployed domain goes in config later.
+- `createInstance({clientToken, components: ["paypal-payments"], pageType: "checkout"})` succeeds,
+  `findEligibleMethods` reports PayPal eligible, and the `<paypal-button>` renders.
+- Remaining: a buyer click-through to prove onApprove, then server-side authorize and verify.
 
 ### Decisions (2026-10-04, after S1/S2 review)
 1. **Success is any 2xx.** No code branches on 200 vs 201 (or 204). State is read from the
