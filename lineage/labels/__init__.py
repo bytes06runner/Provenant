@@ -19,7 +19,7 @@ not a boundary against malicious code running in the same process.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Any
@@ -63,14 +63,19 @@ class Source:
 
 
 class _MintCapability:
-    """Held only by modules allowed to raise trust (mandate and manifest verification)."""
+    """Held only by modules allowed to raise trust (mandate and manifest verification).
 
-    _instance: _MintCapability | None = None
+    Exactly one instance can ever exist. A second construction raises, so code cannot obtain
+    the capability by instantiating the class instead of importing MINT (which a test polices).
+    """
+
+    _created = False
 
     def __new__(cls) -> _MintCapability:
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
+        if cls._created:
+            raise PermissionError("the mint capability cannot be created again")
+        cls._created = True
+        return super().__new__(cls)
 
 
 MINT = _MintCapability()
@@ -136,7 +141,3 @@ def derive[R](fn: Callable[..., R], *inputs: Labeled[Any]) -> Labeled[R]:
     label = join(Label.DERIVED, *(i.label for i in inputs))
     sources = frozenset().union(*(i.sources for i in inputs))
     return Labeled(fn(*(i.value for i in inputs)), label, sources)
-
-
-def combine_sources(values: Iterable[Labeled[Any]]) -> frozenset[Source]:
-    return frozenset().union(*(v.sources for v in values))

@@ -226,3 +226,32 @@ def test_vault_address_is_user_labeled_and_sourced_to_entry(world):
 def test_vault_is_per_user(world):
     with pytest.raises(VaultError):
         world.vault.lookup("user-b", "home")
+
+
+def test_required_and_forbidden_on_same_key_without_clash_is_valid(world):
+    vm = world.mandate(forbidden_attributes={"color": ["navy"]})
+    assert vm.mandate.forbidden_attributes == {"color": ["navy"]}
+
+
+def test_ship_to_ref_is_user_labeled(world):
+    ref = world.mandate().ship_to_ref()
+    assert ref.value == "home" and ref.label is Label.USER
+
+
+def test_naive_clock_rejected(world):
+    env = sign_mandate(IntentMandate(**mandate_payload()), world.user_key)
+    with pytest.raises(MandateError, match="timezone"):
+        verify_mandate(env, user_id=USER, user_keys=world.user_keys, now=NOW.replace(tzinfo=None))
+
+
+def test_manifest_attributes_are_merchant_signed(world):
+    attrs = world.manifest().attributes("TRAIL-BLK-10")
+    assert attrs.value["color"] == "black" and attrs.label is Label.MERCHANT_SIGNED
+
+
+def test_validly_signed_but_malformed_manifest_rejected(world):
+    """A registered merchant signing garbage gets no MERCHANT_SIGNED values out of it."""
+    payload = manifest_payload("northwind", "NWPAYEE123", catalog=[])
+    env = sign("provenant/manifest/v1", payload, world.honest_key)
+    with pytest.raises(ManifestError, match="invalid manifest"):
+        verify_manifest(env, merchant_id="northwind", registry=world.registry)

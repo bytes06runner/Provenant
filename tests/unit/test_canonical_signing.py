@@ -182,3 +182,21 @@ def test_malformed_envelope_dict():
 def test_purpose_with_nul_rejected(key):
     with pytest.raises(SignatureError):
         sign("a\x00b", PAYLOAD, key)
+
+
+@pytest.mark.parametrize("text", ["a", "abcde"])
+def test_malformed_base64_key_rejected(text):
+    with pytest.raises(SignatureError):
+        load_public_key(text)
+
+
+def test_money_helpers():
+    from lineage.money import MoneyError, format_amount, parse_amount, parse_currency
+
+    assert format_amount(Decimal("5")) == "5.00"
+    assert format_amount(parse_amount("12.5")) == "12.50"
+    for bad in ["", "01.00", "1.234", "+1", " 1"]:
+        with pytest.raises(MoneyError):
+            parse_amount(bad)
+    with pytest.raises(MoneyError):
+        parse_currency("US")

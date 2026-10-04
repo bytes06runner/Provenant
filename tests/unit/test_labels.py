@@ -131,3 +131,15 @@ def test_only_verifiers_hold_the_mint_capability():
             if isinstance(node, ast.alias) and node.name == "MINT":
                 offenders.append(str(path.relative_to(root)))
     assert offenders == []
+
+
+def test_mint_capability_cannot_be_constructed_again():
+    from lineage.labels import _MintCapability
+
+    with pytest.raises(PermissionError):
+        _MintCapability()
+
+
+def test_derive_needs_an_input():
+    with pytest.raises(ValueError):
+        derive(lambda: 1)

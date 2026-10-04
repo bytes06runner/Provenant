@@ -12,7 +12,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -197,7 +196,3 @@ def verify_manifest(
     if manifest.merchant_id != merchant_id:
         raise ManifestError("manifest names a different merchant than the one fetched")
     return VerifiedManifest(manifest, envelope)
-
-
-def manifest_payload(manifest: MerchantManifest) -> dict[str, Any]:
-    return manifest.model_dump(mode="json")
