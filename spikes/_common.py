@@ -19,12 +19,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from paypal.client import PayPalClient, PayPalError, PayPalResponse  # noqa: E402
 from paypal.config import (  # noqa: E402
+    REPO_ROOT,
     ConfigError,
     http_settings,
     load_yaml,
     merchant_credentials,
+    operator_credentials,
     require_env,
 )
+from paypal.ledger import RequestLedger  # noqa: E402
 from paypal.redact import redact  # noqa: E402
 
 OUT_DIR = Path(__file__).resolve().parent / "out"
@@ -115,8 +118,27 @@ def spike_config() -> dict[str, Any]:
     return load_yaml("spikes.yaml")
 
 
-def merchant_client(merchant_key: str) -> PayPalClient:
-    return PayPalClient(merchant_credentials(merchant_key), http_settings())
+def spike_ledger() -> RequestLedger:
+    """Local SQLite request ledger for spikes (Postgres is used by the app from Phase 1)."""
+    OUT_DIR.mkdir(exist_ok=True)
+    url = str(spike_config()["ledger_url"])
+    prefix = "sqlite:///"
+    if url.startswith(prefix) and not url[len(prefix) :].startswith("/"):
+        # Relative SQLite paths resolve from the repo root, not the caller's cwd.
+        url = prefix + str(REPO_ROOT / url[len(prefix) :])
+    return RequestLedger.from_url(url)
+
+
+def merchant_client(merchant_key: str, *, ledger: bool = True) -> PayPalClient:
+    return PayPalClient(
+        merchant_credentials(merchant_key),
+        http_settings(),
+        ledger=spike_ledger() if ledger else None,
+    )
+
+
+def operator_client() -> PayPalClient:
+    return PayPalClient(operator_credentials(), http_settings(), ledger=spike_ledger())
 
 
 def session_binding() -> tuple[str, str]:

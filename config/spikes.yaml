@@ -10,6 +10,9 @@ item:
   quantity: 2
 brand_name: "Provenant Spike"
 
+# Request ledger for spikes. SQLite is fine for local spike runs (spikes/out is gitignored).
+ledger_url: "sqlite:///spikes/out/ledger.db"
+
 approval:
   poll_interval_seconds: 3
   timeout_seconds: 1800      # how long to wait for you to approve in the browser

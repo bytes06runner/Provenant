@@ -133,7 +133,9 @@ def main() -> int:
     merchant = args.merchant or cfg["merchant"]
     spike = Spike("S2" if not args.capture_id else "S2b")
     try:
-        client = merchant_client(merchant)
+        # No ledger here on purpose: S2 tests PayPal's own PayPal-Request-Id handling, so it
+        # must be able to resend a request our ledger would refuse.
+        client = merchant_client(merchant, ledger=False)
     except ConfigError as e:
         print(f"Config error: {e}")
         return 2
