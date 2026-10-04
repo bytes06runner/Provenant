@@ -149,6 +149,10 @@ class VerifiedManifest:
                 return p
         raise ManifestError(f"sku {sku!r} is not in {self.merchant_id}'s signed catalog")
 
+    def labeled(self) -> Labeled[VerifiedManifest]:
+        """The whole verified manifest as a MERCHANT_SIGNED value, for plans to pass around."""
+        return self._field(self, "")
+
     # MERCHANT_SIGNED accessors for every field a contract reads.
     def payee(self) -> Labeled[str]:
         return self._field(self.manifest.paypal_merchant_id, "paypal_merchant_id")
