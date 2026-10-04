@@ -284,10 +284,29 @@ Defects found and fixed while testing:
 - gitleaks flagged `user_key: Ed25519PrivateKey` annotations. Allowlisted only that exact class
   name; a probe confirmed real-looking secrets in the same position are still caught.
 
-Interpretation to confirm: the brief says an operation's label is "the join of its inputs", and
-the `amount.total` contract requires DERIVED. A plain join of MERCHANT_SIGNED and USER is
-MERCHANT_SIGNED, never DERIVED. `derive()` therefore returns `join(DERIVED, *inputs)`: computed
-values are at most DERIVED. This is the only reading under which the total contract can pass.
+Label rule (confirmed 2026-10-05): computed values are capped at DERIVED, and any UNTRUSTED input
+makes the result UNTRUSTED. `derive()` returns `join(DERIVED, *inputs)`.
 
 Not in this part (next): DSL and interpreter, Q-LLM extractor, checkout builder, recorder,
 Postgres-backed vault, key and nonce stores.
+
+## 2026-10-05: Decisions after the Phase 1 core review
+
+1. **Labels.** Confirmed: computed values are capped at DERIVED; any UNTRUSTED input makes the
+   result UNTRUSTED.
+2. **Contracts bound to the payee's manifest.** Every MERCHANT_SIGNED source behind `item.sku`,
+   `unit_price` and `amount.total` must carry the same manifest ref and hash as the payee.
+   Implemented in `lineage/contracts` (rule `manifest_differs_from_payee`). Tests block: an
+   attacker-signed sku, price or total with a legit payee (each alone and all together); the
+   reverse (attacker payee with honest item, price and total); a stale, validly signed manifest
+   of the same merchant supplying the price; a payee backed by two manifests; and sources whose
+   ref and hash disagree (minting-bug defense). Mutation check: 7 mutants of the new rule, all
+   killed. The two that first survived (compare only ref, compare only hash) were equivalent for
+   any source the verifiers mint; two tests with deliberately inconsistent sources now kill them.
+3. **Reconciliation poller is a first-class Blackbox component.** GETs are the source of truth;
+   a verified webhook only moves its resource's next poll to now and is never applied to state.
+   Design in [`architecture.md`](architecture.md#reconciliation-poller-blackbox-first-class-component).
+   Reason: the sandbox never generated `PAYMENT.AUTHORIZATION.VOIDED` for a confirmed void, while
+   refund, payout and dispute events were generated and delivered.
+4. **S4.** Waiting for the vault toggle on the merchant apps. If not confirmed this session, S4 is
+   deferred and autonomous mode becomes a stretch goal (human-present checkout only).
