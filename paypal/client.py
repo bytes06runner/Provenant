@@ -225,8 +225,13 @@ class PayPalClient:
         request_id: str | None = None,
         operation_key: str | None = None,
         extra_headers: dict[str, str] | None = None,
+        files: dict[str, tuple[str | None, bytes | str, str]] | None = None,
     ) -> PayPalResponse:
+        """`files` sends multipart/form-data instead of JSON: {part: (filename, content, type)}.
+        A part with filename None is a plain field, e.g. the Disputes API's "input" JSON."""
         method = method.upper()
+        if files is not None and json is not None:
+            raise ValueError("send either json or files, not both")
         headers = {"Accept": "application/json"}
         entry: LedgerEntry | None = None
         if method == "POST":
@@ -246,13 +251,16 @@ class PayPalClient:
             # Same id on every retry, so a retried POST can never double-charge.
             request_id = request_id or str(uuid.uuid4())
             headers["PayPal-Request-Id"] = request_id
-            headers["Content-Type"] = "application/json"
+            if files is None:
+                headers["Content-Type"] = "application/json"  # multipart sets its own
             headers["Prefer"] = "return=representation"
         if extra_headers:
             headers.update(extra_headers)
 
         def send() -> httpx.Response:
             headers["Authorization"] = f"Bearer {self._access_token()}"
+            if files is not None:
+                return self._http.request(method, path, files=files, params=params, headers=headers)
             return self._http.request(
                 method,
                 path,
