@@ -21,7 +21,10 @@
 | S0 | PASS | All 5 REST apps (4 merchants + operator) get OAuth tokens. See below. |
 | S1 | PASS | 14/14 checks, merchant `northwind`, buyer A approved in browser. |
 | S2 | PASS | Void 2/2, idempotent partial refund 5/5. Needed one fix and a resume, see below. |
-| S3 to S8 | Not started | Waiting on S1/S2 per brief. |
+| S3, S7 | In progress | |
+| S4, S6 | Waiting on you | Vault enabled on merchant apps (S4); a sandbox dispute filed (S6). |
+| S5 | Not started | Will use a cloudflared tunnel. |
+| S8 | Not started | After S3 and S7. |
 
 #### S0: OAuth and scopes (2026-10-04)
 All apps: `refund`, `payments/payouts`, `disputes/read-seller`, `disputes/update-seller`,
@@ -46,8 +49,8 @@ Redacted responses (full log in `spikes/out/S1-20261004T150343Z.json`, gitignore
 Findings:
 - `custom_id` propagates order -> authorization -> capture. The decision trace binding in brief
   Section 4.6 works as designed, and is readable from any of the three objects.
-- Create order returns **200** (not 201) when `payment_source.paypal` is supplied. Code must not
-  assume 201.
+- Observation only: create order answered 200 (not 201) when `payment_source.paypal` was
+  supplied. We do not depend on this; see "Decisions" below.
 - Authorization `expiration_time` is exactly 29 days after authorization, matching
   `config/app.yaml: paypal.authorization.valid_days`.
 
@@ -68,18 +71,35 @@ First run: both orders approved by buyer A and authorized (201).
 | Step | HTTP | debug_id | PayPal-Request-Id | Result |
 |---|---|---|---|---|
 | GET capture | 200 | f762156fa950b | | `COMPLETED`, 25.00 USD |
-| POST .../captures/9RD264568L409791S/refund (10.00) | **201** | f7076271b91c8 | 883f88d6-... | refund `23764753N6120533F` |
-| same POST, same request id | **200** | f90832721b725 | 883f88d6-... | same refund id |
-| same POST, same request id | **200** | f41452063af8a | 883f88d6-... | same refund id |
+| POST .../captures/9RD264568L409791S/refund (10.00) | 201 | f7076271b91c8 | 883f88d6-... | refund `23764753N6120533F` |
+| same POST, same request id | 200 | f90832721b725 | 883f88d6-... | same refund id |
+| same POST, same request id | 200 | f41452063af8a | 883f88d6-... | same refund id |
 | GET capture | 200 | f601096b3c2ea | | `PARTIALLY_REFUNDED` |
 | GET order 27X917119W351372Y | 200 | f692589c564fd | | exactly 1 refund, total 10.00 |
 
 Findings:
-- Idempotency works as documented: a replay returns **200** with the original refund, a new
-  one returns **201**. The remedy router can use 201 vs 200 to tell "moved money" from "replayed".
+- PayPal-side idempotency works: replays with the same `PayPal-Request-Id` returned the original
+  refund and created nothing new. Observation only: the first call answered 201 and replays 200.
+  We do not build on that difference (see "Decisions").
 - Void returns 204 with no body. Never parse a void response.
-- State-changing POST responses are minimal by default. Decision for Phase 1: `paypal/client.py`
-  keeps minimal responses and every state change is followed by a GET (single source of truth).
+- State-changing POST responses are minimal by default (only `id`, `status`, `links`).
+
+### Decisions (2026-10-04, after S1/S2 review)
+1. **Success is any 2xx.** No code branches on 200 vs 201 (or 204). State is read from the
+   resource body, and verified with a GET after every state change.
+2. **Idempotency is enforced in our own ledger,** not inferred from PayPal status codes.
+   `paypal/ledger.py` persists every POST: `operation_key`, `PayPal-Request-Id`, app, path,
+   state (`PENDING`/`SUCCEEDED`/`FAILED`), resulting resource id and status, debug id.
+   - The entry is written before the request is sent, so a crash leaves `PENDING` and the retry
+     reuses the same request id.
+   - A `SUCCEEDED` operation is never resent; the client raises `AlreadyCompleted` with the
+     recorded resource id. PayPal's idempotency window is finite, so relying on it alone could
+     move money twice after the window closes.
+   - 4xx is recorded as `FAILED` with the issue code and no resource id.
+3. **Every POST sends `Prefer: return=representation`,** so responses carry the full resource.
+   The verification GET after each state change stays.
+4. Spikes use a SQLite ledger under `spikes/out/` (gitignored). S2 deliberately runs without a
+   ledger because it tests PayPal's own request-id handling.
 
 ### Design notes from writing S1/S2
 - Orders are created with `payment_source.paypal.experience_context`, so PayPal returns a
@@ -90,6 +110,11 @@ Findings:
 - S2 idempotency check: same `PayPal-Request-Id` sent 3 times; pass requires one refund id,
   one refund on the order, capture status `PARTIALLY_REFUNDED`, refunded total equal to a
   single partial refund.
+
+### Tooling
+- gitleaks runs as a pre-commit hook (`.pre-commit-config.yaml`), with extra rules for PayPal
+  client ids, secrets and access tokens in `.gitleaks.toml`. Verified: a staged realistic secret
+  is blocked; full history scan is clean.
 
 ### Open items
 - PayPal AI-Toolkit plugin was not loaded in this session, so its `paypal-best-practices` skill
