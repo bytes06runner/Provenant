@@ -21,7 +21,8 @@
 | S0 | PASS | All 5 REST apps (4 merchants + operator) get OAuth tokens. See below. |
 | S1 | PASS | 14/14 checks, merchant `northwind`, buyer A approved in browser. |
 | S2 | PASS | Void 2/2, idempotent partial refund 5/5. Needed one fix and a resume, see below. |
-| S3, S7 | In progress | |
+| S3 | PASS (8/8) | Payout to both buyers, batch SUCCESS in ~35 s, ledger refused a duplicate. Webhook part moves to S5. |
+| S7 | PASS (35/35) | 9 of 11 mock codes honored across create, authorize, capture, refund; 2 unsupported. |
 | S4, S6 | Waiting on you | Vault enabled on merchant apps (S4); a sandbox dispute filed (S6). |
 | S5 | Not started | Will use a cloudflared tunnel. |
 | S8 | Not started | After S3 and S7. |
@@ -83,6 +84,59 @@ Findings:
   We do not build on that difference (see "Decisions").
 - Void returns 204 with no body. Never parse a void response.
 - State-changing POST responses are minimal by default (only `id`, `status`, `links`).
+
+#### S3: liability payouts from the operator account (2026-10-04, 15:22 UTC)
+Log: `spikes/out/S3-20261004T152258Z.json`. Receivers are buyer A and buyer B (masked in logs).
+
+| Step | HTTP | debug_id | Result |
+|---|---|---|---|
+| POST /v1/payments/payouts (2 x 3.00 USD) | 2xx (201) | f8953241036f9 | batch `3YF7NXH63SS4C`, `PENDING`; ledger stored request id `5d595f60-...` and batch id |
+| same operation key again | not sent | | ledger raised `AlreadyCompleted -> 3YF7NXH63SS4C`; PayPal never called |
+| GET batch (polled every 5 s) | 200 | f7481609afa28 | `PENDING` x3, `PROCESSING` x3, then `SUCCESS` |
+| GET payout item PQVDT3ECKMSSL | 200 | f390941ae021d | `SUCCESS`, txn `0MG70575VR024223U` |
+| GET payout item SVRY23BFS8ENG | 200 | f795507aac33d | `SUCCESS`, txn `0BG73646J88215940` |
+
+Findings:
+- Payouts work from the operator app with no extra dashboard setup. Fallback (invoice credit) not
+  needed.
+- Sandbox fee 0.25 USD per item (0.50 per batch here). The liability pool must budget for fees.
+- Batch completion is asynchronous (~35 s here). The remedy router must treat a payout as
+  in-flight until the batch is terminal, via polling now and `PAYMENT.PAYOUTSBATCH.*` webhooks
+  after S5.
+- Not yet proven: payout webhooks (S5).
+
+#### S7: negative testing with PayPal-Mock-Response (2026-10-04, 15:26 UTC)
+Log: `spikes/out/S7-20261004T152630Z.json`. Targets were chosen so the real (unmocked) result is a
+different error: fresh invoice ids, an unapproved order, the voided authorization
+`15T846825A7221243`, and a refund of 100x the S1 capture `3B162418P49418349`. Baselines without
+the header, run separately: capture -> 422 `AUTHORIZATION_VOIDED`, refund -> 422
+`REFUND_AMOUNT_EXCEEDED`. No money moved in any case.
+
+| Operation | Mock code | HTTP | Outcome |
+|---|---|---|---|
+| create order | DUPLICATE_INVOICE_ID | 422 | honored |
+| create order | INTERNAL_SERVER_ERROR | 500 | honored (client retried 3x with same request id, then FAILED) |
+| authorize | INSTRUMENT_DECLINED | 422 | honored |
+| authorize | TRANSACTION_REFUSED | 422 | honored |
+| authorize | PAYER_ACCOUNT_RESTRICTED | 422 | honored |
+| capture | TRANSACTION_REFUSED | 422 | honored |
+| capture | AUTHORIZATION_EXPIRED | 422 | honored |
+| capture | DECLINED_DUE_TO_RELATED_TXN | 403 | **unsupported** (empty body, debug f983861654153) |
+| refund | TRANSACTION_REFUSED | 403 | **unsupported** (empty body, debug f7146488ecf95) |
+| refund | CAPTURE_FULLY_REFUNDED | 422 | honored |
+| refund | REFUND_FAILED_INSUFFICIENT_FUNDS | 422 | honored |
+
+Every case, honored or not: the ledger entry is `FAILED` with no resource id and a non-empty
+error, and the order / authorization / capture state is identical before and after. Ledger after
+two S7 runs: 22 `FAILED` (all without resource id), 3 `SUCCEEDED`.
+
+Findings:
+- A mock code the endpoint does not support returns **403 with an empty body**. Confirmed with a
+  made-up code (`NOT_A_REAL_MOCK_CODE`) on both capture and refund. The negative-testing suite
+  must only use codes from the honored list above.
+- Mocked 4xx responses share a fixed `debug_id` (`70c28ae654da`). Never treat debug ids as unique.
+- Bug found and fixed: an empty error body produced the ledger error `None: None`. `PayPalError`
+  now has a never-empty `summary()` (`HTTP 403, empty body`), covered by a unit test.
 
 ### Decisions (2026-10-04, after S1/S2 review)
 1. **Success is any 2xx.** No code branches on 200 vs 201 (or 204). State is read from the
