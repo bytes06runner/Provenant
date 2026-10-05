@@ -144,3 +144,10 @@ def test_empty_error_body_still_recorded_meaningfully(ledger):
     with pytest.raises(PayPalError):
         client.post("/x", json={}, operation_key="op")
     assert ledger.get("op").error == "HTTP 403, empty body"
+
+
+def test_resource_ids_lists_what_we_caused(ledger):
+    client, _ = client_with(ledger, lambda r: httpx.Response(201, json={"id": "R9"}))
+    client.post("/x", json={}, operation_key="a")
+    ledger.begin("pending-op", "merchant:test", "POST", "/y")
+    assert ledger.resource_ids() == {"R9"}

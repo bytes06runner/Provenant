@@ -157,6 +157,15 @@ class RequestLedger:
             )
         return entry
 
+    def resource_ids(self) -> set[str]:
+        """Every PayPal resource our own POSTs created (succeeded operations)."""
+        q = select(paypal_requests.c.resource_id).where(
+            paypal_requests.c.state == OpState.SUCCEEDED.value,
+            paypal_requests.c.resource_id.is_not(None),
+        )
+        with self.engine.connect() as conn:
+            return {str(r[0]) for r in conn.execute(q)}
+
     def mark_attempt(self, operation_key: str) -> None:
         with self.engine.begin() as conn:
             conn.execute(
