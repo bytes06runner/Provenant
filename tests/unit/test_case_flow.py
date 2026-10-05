@@ -474,6 +474,10 @@ def test_narrator_numbers_must_come_from_the_result():
     dashed = {**NARRATION, "holding": "Fault is shared — mostly."}
     assert narrate(Router({"narrator": [dashed]}), RESULT)["rejected"] == "em dash"
     assert narrate(Router({"narrator": [NARRATION]}), RESULT)["source"] == "fake/narrator-model"
+    listed = {**NARRATION, "findings": ["1. Ordered A.", "2) Refund 90.52.", "- Shared."]}
+    out = narrate(Router({"narrator": [listed]}), RESULT)
+    assert out["source"] == "fake/narrator-model"  # list markers are layout, not numbers
+    assert out["ruling"]["findings"] == ["Ordered A.", "Refund 90.52.", "Shared."]
 
 
 def test_conflicting_evidence_goes_to_a_human_and_moves_no_money(tmp_path, world):
@@ -559,3 +563,54 @@ def test_a_shared_planning_failure_is_not_retried(world):
     r.replies["planner"] = [GOOD_PLAN]
     assert plans({"mandate": {}}, agent, 1)[1] is False
     assert plans({"mandate": {}}, agent, 1)[1] is True
+
+
+# ---- re-rendering a recorded case -------------------------------------------------------------
+
+
+def test_rerender_recomputes_intervals_from_recorded_replays(tmp_path, world):
+    from blackbox.case import rerender_case
+    from blackbox.facts import Facts
+
+    c, r = misrep_case(tmp_path, world, ATT_CFG)
+    calls = len(c.router.calls)
+    c.deps.attribution_cfg = {**ATT_CFG, "ci_level": "0.80"}
+    again = rerender_case(c.deps, "s-1")
+    assert c.router.calls[calls:] == ["narrator"]  # no replays, only the ruling text
+    assert again.attribution["shares"] == r.attribution["shares"]
+    assert again.attribution["ci_level"] == "0.8000" and again.attribution["k"] == 3
+    assert again.evidence_pdf.name == "r-s-1-jeffreys.pdf" and again.evidence_pdf.exists()
+    kinds = [e.event_type for e in c.recorder.events(r.case_id)]
+    assert kinds[-4:] == ["attribution.revised", "remedy.proposed", "ruling", "evidence_pack"]
+    assert Facts.from_dict(r.facts.to_dict()) == r.facts
+    c.recorder.verify(r.case_id)
+
+
+def test_rerender_needs_a_completed_replay(tmp_path, world):
+    from blackbox.case import rerender_case
+
+    c = make(tmp_path, world, {})
+    s = c.purchase(captured=False, blob=False)
+    run_case(c.deps, s, Complaint("Just checking.", {}, {}), k=1, approve=False)
+    with pytest.raises(CaseError, match="no completed replay"):
+        rerender_case(c.deps, s)
+
+
+def test_rerender_reads_overpayment_from_the_recorded_outcome(tmp_path, world):
+    from blackbox.case import rerender_case
+
+    c = make(
+        tmp_path,
+        world,
+        {"planner": [RANK_PLAN], "reference_policy": [RANK_PLAN], "extractor": [{"order": [1, 0]}]},
+    )
+    s = c.purchase(
+        sku="TRAIL-BLK-10-PRO",
+        total="130.00",
+        shipped=None,
+        preference="lowest_total",
+        max_unit_price="130.00",
+    )
+    run_case(c.deps, s, Complaint("I asked for the cheapest.", {}, {}), k=4, approve=False)
+    again = rerender_case(c.deps, s)
+    assert again.plan.harm == "overpaid" and again.plan.r == "26.00"

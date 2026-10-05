@@ -26,9 +26,15 @@ from typing import Any
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
-from blackbox.attribution import PLAYERS, Attribution, attribute, label
+from blackbox.attribution import PLAYERS, Attribution, Coalition, attribute, coalitions, label
 from blackbox.facts import Facts, establish
-from blackbox.intake import Complaint, PurchaseRecord, file_complaint, load_purchase
+from blackbox.intake import (
+    Complaint,
+    PurchaseRecord,
+    case_id_for,
+    file_complaint,
+    load_purchase,
+)
 from blackbox.narrate import narrate
 from blackbox.reconcile import ReconciliationPoller
 from blackbox.recorder import FlightRecorder
@@ -55,6 +61,7 @@ from lineage.manifest import (
     verify_manifest,
 )
 from lineage.money import parse_amount
+from lineage.signing import SignedEnvelope
 from lineage.vault import AddressVault
 from llm import roles
 from llm.types import Image
@@ -258,13 +265,7 @@ def run_case(
         chosen = {"merchant_id": purchase.merchant_id, "sku": purchase.sku, "total": purchase.total}
         observed_bad, why = judge(chosen, truth, clarified)
         best = best_total(truth, clarified)
-        if (
-            not facts.decision_wrong
-            and best is not None
-            and parse_amount(purchase.total) > best
-            and clarified.mandate.preference is not None
-        ):
-            overpayment = parse_amount(purchase.total) - best
+        overpayment = _overpayment(facts, purchase, clarified, best)
         record(
             "outcome.observed",
             {
@@ -315,8 +316,75 @@ def run_case(
             )
         else:
             note = f"the purchase satisfies the clarified intent ({why}); no replay needed"
+    result = _conclude(
+        deps,
+        case,
+        purchase,
+        original,
+        clarified,
+        merchant,
+        facts,
+        attribution,
+        note,
+        state,
+        overpayment,
+        record,
+    )
+    plan = result.plan
+
+    if approve and plan.status == "proposed":
+        record("remedy.approved", {"by": "operator", "plan": plan.to_dict()})
+        result.executed = execute(
+            plan,
+            case_id=case,
+            merchant_id=purchase.merchant_id,
+            authorization_id=state["authorization_id"],
+            capture_id=state["capture_id"],
+            currency=state["currency"],
+            buyer_email=deps.buyer_email,
+            paypal=deps.paypal,
+            poller=deps.poller,
+            record=record,
+        )
+        result.settled = deps.poller.settle(
+            case, max_rounds=deps.max_settle_rounds, sleep=deps.sleep
+        )
+        result.discrepancies = deps.poller.discrepancies(
+            case_id=case, order_id=purchase.order_id, app=purchase.merchant_id, caused=deps.caused()
+        )
+    record(
+        "case.closed",
+        {
+            "plan_status": plan.status,
+            "executed": result.executed,
+            "settled": result.settled,
+            "discrepancies": len(result.discrepancies),
+        },
+    )
+    return result
+
+
+def _conclude(
+    deps: CaseDeps,
+    case: str,
+    purchase: PurchaseRecord,
+    original: VerifiedMandate,
+    clarified: VerifiedMandate,
+    merchant: VerifiedManifest,
+    facts: Facts,
+    attribution: Attribution | None,
+    note: str,
+    state: dict[str, Any],
+    overpayment: Decimal | None,
+    record: Callable[[str, dict[str, Any]], None],
+    *,
+    attribution_event: str = "attribution",
+    pdf_name: str | None = None,
+) -> CaseResult:
+    """Attribution record, remedy proposal, ruling and evidence pack. No money moves here."""
+    rec = deps.recorder
     att = attribution.to_dict() if attribution else None
-    record("attribution", att or {"note": note})
+    record(attribution_event, att or {"note": note})
 
     captured = parse_amount(state["captured"]) if state["captured"] else None
     plan = plan_remedy(
@@ -350,41 +418,98 @@ def run_case(
 
     pack = _pack(deps, case, purchase, original, clarified, merchant, facts, att, plan, ruling)
     deps.out_dir.mkdir(parents=True, exist_ok=True)
-    pdf = deps.out_dir / f"{case}.pdf"
+    pdf = deps.out_dir / (pdf_name or f"{case}.pdf")
     pdf.write_bytes(pack)
     record("evidence_pack", {"blob": rec.put_blob(pack, "application/pdf"), "bytes": len(pack)})
-    result = CaseResult(case, facts, att, plan, ruling, pdf)
+    return CaseResult(case, facts, att, plan, ruling, pdf)
 
-    if approve and plan.status == "proposed":
-        record("remedy.approved", {"by": "operator", "plan": plan.to_dict()})
-        result.executed = execute(
-            plan,
-            case_id=case,
-            merchant_id=purchase.merchant_id,
-            authorization_id=state["authorization_id"],
-            capture_id=state["capture_id"],
-            currency=state["currency"],
-            buyer_email=deps.buyer_email,
-            paypal=deps.paypal,
-            poller=deps.poller,
-            record=record,
-        )
-        result.settled = deps.poller.settle(
-            case, max_rounds=deps.max_settle_rounds, sleep=deps.sleep
-        )
-        result.discrepancies = deps.poller.discrepancies(
-            case_id=case, order_id=purchase.order_id, app=purchase.merchant_id, caused=deps.caused()
-        )
-    record(
-        "case.closed",
-        {
-            "plan_status": plan.status,
-            "executed": result.executed,
-            "settled": result.settled,
-            "discrepancies": len(result.discrepancies),
-        },
+
+def rerender_case(deps: CaseDeps, session_id: str) -> CaseResult:
+    """Recompute a closed case's attribution from its recorded replays with the current interval
+    method, and write a revised ruling and evidence pack. No new replays, no PayPal calls: the
+    revised report is appended to the case chain as `attribution.revised` and its own pack."""
+    rec = deps.recorder
+    purchase = load_purchase(rec, session_id)
+    case = case_id_for(session_id)
+    events = rec.events(case)
+    starts = [i for i, e in enumerate(events) if e.event_type == "complaint.filed"]
+    segment: list[Any] = []
+    for i in reversed(starts):
+        nxt = next((j for j in starts if j > i), len(events))
+        seg = events[i:nxt]
+        att_ev = next((e for e in seg if e.event_type == "attribution"), None)
+        if att_ev is not None and att_ev.payload.get("v"):
+            segment = seg
+            break
+    if not segment:
+        raise CaseError(f"{case}: no completed replay to re-render")
+
+    def one(t: str) -> dict[str, Any]:
+        return dict(next(e for e in segment if e.event_type == t).payload)
+
+    by_label = {label(c): c for c in coalitions()}
+    samples: dict[Coalition, list[int]] = {}
+    for e in segment:
+        if e.event_type == "replay.run":
+            samples.setdefault(by_label[e.payload["coalition"]], []).append(int(e.payload["bad"]))
+    cfg = deps.attribution_cfg
+    attribution = attribute(
+        samples,
+        draws=int(cfg["posterior_draws"]),
+        ci_level=Fraction(str(cfg["ci_level"])),
+        max_ci_width=Fraction(str(cfg["max_ci_width_for_auto"])),
+        seed=case,
     )
-    return result
+    original = verify_mandate(
+        purchase.mandate_envelope,
+        user_id=deps.user_id,
+        user_keys=deps.user_keys,
+        now=_purchase_time(purchase),
+    )
+    clarified = verify_mandate(
+        SignedEnvelope.from_dict(one("mandate.clarified")["envelope"]),
+        user_id=deps.user_id,
+        user_keys=deps.user_keys,
+        now=original.mandate.issued_at + timedelta(seconds=1),
+    )
+    facts = Facts.from_dict(one("facts.established"))
+    observed = one("outcome.observed")
+    best = parse_amount(observed["best_total"]) if observed.get("best_total") else None
+    overpayment = _overpayment(facts, purchase, clarified, best)
+    merchant = _manifests(deps, purchase)[purchase.merchant_id]
+
+    def record(event_type: str, payload: dict[str, Any]) -> None:
+        rec.append(case, event_type, payload)
+
+    return _conclude(
+        deps,
+        case,
+        purchase,
+        original,
+        clarified,
+        merchant,
+        facts,
+        attribution,
+        "",
+        one("paypal.state"),
+        overpayment,
+        record,
+        attribution_event="attribution.revised",
+        pdf_name=f"{case}-{attribution.interval}.pdf",
+    )
+
+
+def _overpayment(
+    facts: Facts, purchase: PurchaseRecord, clarified: VerifiedMandate, best: Decimal | None
+) -> Decimal | None:
+    if (
+        not facts.decision_wrong
+        and best is not None
+        and parse_amount(purchase.total) > best
+        and clarified.mandate.preference is not None
+    ):
+        return parse_amount(purchase.total) - best
+    return None
 
 
 def _purchase_time(purchase: PurchaseRecord) -> Any:
@@ -485,4 +610,4 @@ def _pack(
     )
 
 
-__all__ = ["CaseDeps", "CaseResult", "label", "run_case"]
+__all__ = ["CaseDeps", "CaseResult", "label", "rerender_case", "run_case"]

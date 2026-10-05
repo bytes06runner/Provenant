@@ -55,6 +55,22 @@ class Facts:
             "conflicts": self.conflicts,
         }
 
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> Facts:
+        """Inverse of to_dict (decision_wrong is derived), for re-rendering a recorded case."""
+        return cls(
+            ordered_sku=d["ordered_sku"],
+            shipped_sku=d["shipped_sku"],
+            signed_attributes=dict(d["signed_attributes"]),
+            actual_attributes=dict(d["actual_attributes"]),
+            fulfillment_fault=bool(d["fulfillment_fault"]),
+            misrepresentations=dict(d["misrepresentations"]),
+            clarified_violations=list(d["clarified_violations"]),
+            shipped=bool(d["shipped"]),
+            delivery_check=d["delivery_check"],
+            conflicts=list(d["conflicts"]),
+        )
+
 
 def violations_against(
     attributes: dict[str, str], required: dict[str, str], forbidden: dict[str, list[str]]

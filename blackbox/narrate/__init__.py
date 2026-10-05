@@ -16,6 +16,7 @@ from llm import roles
 from llm.types import LLMRequest, Message
 
 # A number may end a sentence ("Refund 45.26."): only a following digit or letter extends it.
+_LIST_MARKER = re.compile(r"^\s*(?:\d+[.)]|[-*])\s+")  # "2. ", "3) ", "- ": layout, not a claim
 _NUMBER = re.compile(r"(?<![\w.])\d+(?:\.\d+)?(?!\w|\.\d)")
 
 
@@ -73,6 +74,7 @@ def narrate(router: roles.Router, result: dict[str, Any]) -> dict[str, Any]:
     )
     try:
         ruling = roles.parse_json(resp.text)
+        ruling["findings"] = [_LIST_MARKER.sub("", str(f)) for f in ruling["findings"]]
         text = " ".join(
             [ruling["heading"], *ruling["findings"], ruling["holding"], ruling["remedy"]]
         )
