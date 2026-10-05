@@ -13,6 +13,7 @@ scripts/register_merchants.py)
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -35,6 +36,7 @@ SEEDS_DIR = REPO_ROOT / "merchants" / "seeds"
 class FulfillRequest(BaseModel):
     order_ref: str
     sku: str
+    force_wrong_variant: bool = False  # planted faults for evaluation only
 
 
 def load_storefronts(
@@ -60,7 +62,7 @@ def load_storefronts(
     return stores
 
 
-def create_app(stores: dict[str, Storefront]) -> FastAPI:
+def create_app(stores: dict[str, Storefront], *, allow_planted: bool = False) -> FastAPI:
     app = FastAPI(title="Provenant merchant simulator")
 
     def store(merchant: str) -> Storefront:
@@ -97,8 +99,12 @@ def create_app(stores: dict[str, Storefront]) -> FastAPI:
 
     @app.post("/m/{merchant}/fulfill")
     def fulfill(merchant: str, body: FulfillRequest) -> dict[str, Any]:
+        if body.force_wrong_variant and not allow_planted:
+            raise HTTPException(403, "planted faults are disabled (SIMULATOR_ALLOW_PLANTED)")
         try:
-            s = store(merchant).fulfill(body.order_ref, body.sku)
+            s = store(merchant).fulfill(
+                body.order_ref, body.sku, force_wrong_variant=body.force_wrong_variant
+            )
         except StorefrontError as e:
             raise HTTPException(404, str(e)) from None
         return {
@@ -112,7 +118,9 @@ def create_app(stores: dict[str, Storefront]) -> FastAPI:
 
 
 def _app() -> FastAPI:  # pragma: no cover  (wired at server start)
-    return create_app(load_storefronts())
+    return create_app(
+        load_storefronts(), allow_planted=os.environ.get("SIMULATOR_ALLOW_PLANTED") == "1"
+    )
 
 
 def __getattr__(name: str) -> FastAPI:  # pragma: no cover

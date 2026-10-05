@@ -141,11 +141,15 @@ class Storefront:
 
     # ---- fulfillment -------------------------------------------------------------------
 
-    def fulfill(self, order_ref: str, sku: str) -> Shipment:
+    def fulfill(self, order_ref: str, sku: str, *, force_wrong_variant: bool = False) -> Shipment:
+        """Ship an order. `force_wrong_variant` plants a fulfillment fault for evaluation; the
+        service only honors it when started with SIMULATOR_ALLOW_PLANTED=1."""
         ordered = self.product(sku)
         shipped = ordered
         p_wrong = Decimal(str(self.behavior.get("wrong_variant_probability", "0")))
-        if p_wrong > 0 and _unit_interval(self.key, order_ref, sku) < p_wrong:
+        if force_wrong_variant or (
+            p_wrong > 0 and _unit_interval(self.key, order_ref, sku) < p_wrong
+        ):
             variants = [
                 q
                 for q in self.seed.products

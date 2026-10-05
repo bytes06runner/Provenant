@@ -296,3 +296,13 @@ def test_sloppy_with_no_other_variant_ships_the_order(world):
     s.products = [s.products[0]]
     lone = Storefront(profile("bayline"), s, stores["bayline"].signing_key, "BAYPAYEE")
     assert all(lone.fulfill(f"o{i}", s.products[0].sku).correct for i in range(20))
+
+
+def test_planted_wrong_variant_only_when_allowed(world):
+    stores, _, _ = world
+    s = stores["northwind"].fulfill("o1", "NOR-001", force_wrong_variant=True)
+    assert not s.correct and s.shipped_attributes["size_us"] == "10"
+    body = {"order_ref": "o1", "sku": "NOR-001", "force_wrong_variant": True}
+    assert TestClient(create_app(stores)).post("/m/northwind/fulfill", json=body).status_code == 403
+    ok = TestClient(create_app(stores, allow_planted=True)).post("/m/northwind/fulfill", json=body)
+    assert ok.json()["shipped_sku"] != "NOR-001"
