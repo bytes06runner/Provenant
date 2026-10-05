@@ -45,3 +45,11 @@ webhooks:
       - PAYMENT.PAYOUTSBATCH.SUCCESS
       - PAYMENT.PAYOUTSBATCH.DENIED
   path_prefix: /webhooks/paypal
+
+purchase:
+  mandate_ttl_minutes: 60
+  planner_prompt: planner_v2
+  planner_max_repairs: 1
+  q_llm_seed: 7                 # fixed seed so extraction and ranking replay identically
+  approval_poll_seconds: 5
+  approval_timeout_seconds: 900

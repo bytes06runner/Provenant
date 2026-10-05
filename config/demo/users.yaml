@@ -1,0 +1,14 @@
+# Demo shoppers. In the product these come from the Buyer App, where the user enters and
+# confirms saved addresses; here they are demo data for the end-to-end script.
+users:
+  buyer_a:
+    display_name: "Buyer A"
+    paypal_buyer_env: PAYPAL_BUYER_A_EMAIL
+    addresses:
+      home:
+        full_name: "Buyer A"
+        address_line_1: "1 Main St"
+        admin_area_2: "San Jose"
+        admin_area_1: "CA"
+        postal_code: "95131"
+        country_code: "US"
