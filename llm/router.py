@@ -16,9 +16,11 @@ falling back would hide a configuration bug.
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime
 from typing import Any
 
 from llm.budget import BudgetTracker
@@ -28,6 +30,7 @@ from llm.providers import Provider
 from llm.types import AllTargetsExhausted, LLMError, LLMRequest, LLMResponse, RateLimited
 
 Recorder = Callable[[str, dict[str, Any]], None]
+log = logging.getLogger("provenant.llm")
 
 
 def estimate_tokens(request: LLMRequest) -> int:
@@ -72,6 +75,7 @@ class LLMRouter:
         self.sleep = sleep
         self.clock = clock
         self._cooldowns = _Cooldowns()
+        self._warned: set[tuple[str, str, str]] = set()  # (model, metric, UTC day)
 
     def call(self, role: str, request: LLMRequest, *, sample_index: int = 0) -> LLMResponse:
         chain = self.config.chain(role)
@@ -95,6 +99,7 @@ class LLMRouter:
             try:
                 response = self._call_with_retries(target, request)
             except RateLimited as e:
+                self._learn_quota(role, target, e)
                 cool = e.retry_after or self.settings.default_cooldown_seconds
                 self._cooldowns.until[target.label()] = self.clock() + cool
                 skipped.append(f"{target.label()}: 429, cooling down {cool:.0f}s")
@@ -109,12 +114,59 @@ class LLMRouter:
                     continue
                 raise
             self.budget.record(target.provider, target.model, role, response.usage.total_tokens)
+            self._warn_if_near_budget(role, target)
             key = cache_key(target.provider, target.model, request, sample_index)
             if policy is CachePolicy.ALWAYS:
                 self.cache.put(key, response)
             self._emit(role, target, key, response, request, sample_index)
             return response
         raise AllTargetsExhausted(f"role {role!r}: " + "; ".join(skipped))
+
+    # ---- budget visibility ---------------------------------------------------------
+
+    def _warn_if_near_budget(self, role: str, target: Target) -> None:
+        lim = self.budget.limits_for(target.model)
+        spend = self.budget.spend(target.model)
+        day = datetime.now(UTC).strftime("%Y-%m-%d")
+        frac = self.config.warning_fraction
+        for metric, used, limit in (
+            ("requests_per_day", spend.requests_today, lim.requests_per_day),
+            ("tokens_per_day", spend.tokens_today, lim.tokens_per_day),
+        ):
+            key = (target.model, metric, day)
+            if used >= frac * limit and key not in self._warned:
+                self._warned.add(key)
+                log.warning("%s at %s of %s %s", target.label(), used, limit, metric)
+                self.record(
+                    "llm.budget_warning",
+                    {
+                        "role": role,
+                        "target": target.label(),
+                        "metric": metric,
+                        "used": used,
+                        "limit": limit,
+                        "threshold": str(frac),
+                    },
+                )
+
+    def _learn_quota(self, role: str, target: Target, e: RateLimited) -> None:
+        """A provider's quota 429 states the real daily limit; adopt it immediately."""
+        if not e.quota or "PerDay" not in e.quota["id"] or not e.quota["value"].isdigit():
+            return
+        value = int(e.quota["value"])
+        current = self.budget.limits_for(target.model)
+        if current.requests_per_day != value:
+            self.budget.limits[target.model] = replace(current, requests_per_day=value)
+            log.warning("%s daily request limit is %s (%s)", target.label(), value, e.quota["id"])
+            self.record(
+                "llm.quota_discovered",
+                {
+                    "role": role,
+                    "target": target.label(),
+                    "quota_id": e.quota["id"],
+                    "requests_per_day": value,
+                },
+            )
 
     # ---- internals ---------------------------------------------------------------
 

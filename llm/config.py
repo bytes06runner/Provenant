@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from decimal import Decimal
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -42,6 +43,11 @@ class LLMConfig:
     limits: dict[str, Limits]
     default_limits: Limits
     http: dict[str, Any]
+    calls: dict[str, dict[str, Any]] = field(default_factory=dict)
+    warning_fraction: Decimal = Decimal("0.8")
+
+    def call_defaults(self, role: str) -> dict[str, Any]:
+        return dict(self.calls.get(role, {}))
 
     def chain(self, role: str) -> tuple[Target, ...]:
         try:
@@ -92,6 +98,8 @@ def load_llm_config(yaml_path: Path | None = None, env: dict[str, str] | None = 
         limits={m: _limits(v) for m, v in (budgets.get("models") or {}).items()},
         default_limits=_limits(budgets["default"]),
         http=cfg["http"],
+        calls=cfg.get("calls") or {},
+        warning_fraction=Decimal(str(cfg.get("budget_warning_fraction", "0.8"))),
     )
 
 

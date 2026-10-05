@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 
 import httpx
@@ -603,7 +604,8 @@ def test_api_key_and_provider_factory(yaml_file):
 def test_replay_settings_k_is_per_run():
     from blackbox.replay import ReplaySettings
 
-    assert ReplaySettings.for_run().k == 8  # config/app.yaml default
+    assert ReplaySettings.for_run().k == 4  # config/app.yaml default (development, eval)
+    assert ReplaySettings.for_demo().k == 8  # the recorded demo case
     assert ReplaySettings.for_run(k=3).k == 3
     with pytest.raises(ValueError):
         ReplaySettings(0)
@@ -725,3 +727,135 @@ def test_structured_output_modes(mode, groq_format, gemini_has_schema):
     assert cache_key("g", "m", request) != cache_key(
         "g", "m", LLMRequest(messages=REQ.messages, json_schema={"type": "object"}, structured="x")
     )
+
+
+def test_budget_warning_at_80_percent_fires_once_per_day():
+    events: list = []
+    cfg = config()
+    cfg = LLMConfig(
+        cfg.providers,
+        cfg.chains,
+        cfg.cache,
+        {"m1": Limits(100_000, 5, 100_000)},
+        cfg.default_limits,
+        {},
+    )
+    groq = FakeProvider("groq", ["a"] * 5)
+    r = router({"groq": groq, "gemini": FakeProvider("gemini", [])}, cfg=cfg, events=events)
+    for _ in range(5):
+        r.call("r", REQ)
+    warnings = [p for k, p in events if k == "llm.budget_warning"]
+    assert len(warnings) == 1
+    assert warnings[0]["metric"] == "requests_per_day" and warnings[0]["used"] == 4
+    assert warnings[0]["limit"] == 5 and warnings[0]["threshold"] == "0.8"
+
+
+def test_token_budget_warning():
+    events: list = []
+    cfg = config()
+    cfg = LLMConfig(
+        cfg.providers,
+        cfg.chains,
+        cfg.cache,
+        {"m1": Limits(100_000, 100, 12)},
+        cfg.default_limits,
+        {},
+    )
+    r = router(
+        {"groq": FakeProvider("groq", ["a"]), "gemini": FakeProvider("gemini", [])},
+        cfg=cfg,
+        events=events,
+    )
+    r.budget.limits["m1"] = Limits(100_000, 100, 10_000)  # let the call through
+    r.call("r", REQ)
+    r.budget.limits["m1"] = Limits(100_000, 100, 12)  # 10 tokens used of 12: over 80%
+    r._warn_if_near_budget("r", Target("groq", "m1"))
+    assert [p["metric"] for k, p in events if k == "llm.budget_warning"] == ["tokens_per_day"]
+
+
+def test_quota_429_teaches_the_router_the_real_daily_limit():
+    events: list = []
+    quota = {"id": "GenerateRequestsPerDayPerProjectPerModel-FreeTier", "value": "20"}
+    groq = FakeProvider("groq", [RateLimited("groq", "m1", "quota", 50000.0, quota)])
+    gem = FakeProvider("gemini", ["b"])
+    r = router({"groq": groq, "gemini": gem}, events=events)
+    assert r.call("r", REQ).text == "b"
+    assert r.budget.limits_for("m1").requests_per_day == 20
+    (q,) = [p for k, p in events if k == "llm.quota_discovered"]
+    assert q["requests_per_day"] == 20 and q["target"] == "groq/m1"
+
+
+@pytest.mark.parametrize(
+    "quota",
+    [None, {"id": "GenerateRequestsPerMinute", "value": "15"}, {"id": "PerDay", "value": "n/a"}],
+)
+def test_non_daily_or_malformed_quotas_are_ignored(quota):
+    groq = FakeProvider("groq", [RateLimited("groq", "m1", "q", 5.0, quota)])
+    r = router({"groq": groq, "gemini": FakeProvider("gemini", ["b"])})
+    before = r.budget.limits_for("m1")
+    r.call("r", REQ)
+    assert r.budget.limits_for("m1") == before
+
+
+def test_same_quota_value_is_not_reannounced():
+    events: list = []
+    quota = {"id": "RequestsPerDay", "value": "100"}  # equals the current limit
+    groq = FakeProvider("groq", [RateLimited("groq", "m1", "q", 5.0, quota)])
+    r = router({"groq": groq, "gemini": FakeProvider("gemini", ["b"])}, events=events)
+    r.call("r", REQ)
+    assert not [k for k, _ in events if k == "llm.quota_discovered"]
+
+
+def test_gemini_quota_failure_is_parsed():
+    body = {
+        "error": {
+            "message": "quota",
+            "details": [
+                {
+                    "@type": "type.googleapis.com/google.rpc.QuotaFailure",
+                    "violations": [
+                        {
+                            "quotaId": "GenerateRequestsPerDayPerProjectPerModel-FreeTier",
+                            "quotaValue": "20",
+                        }
+                    ],
+                },
+                {"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "52758s"},
+            ],
+        }
+    }
+    responses = iter(
+        [
+            httpx.Response(429, json=body),
+            httpx.Response(429, text="x"),
+            httpx.Response(
+                429,
+                json={
+                    "error": {
+                        "details": [{"@type": "x.QuotaFailure", "violations": [{"quotaId": "a"}]}]
+                    }
+                },
+            ),
+        ]
+    )
+    p = GeminiProvider(
+        "gemini", "https://gm", "k", timeout=5, transport=mock(lambda r: next(responses))
+    )
+    with pytest.raises(RateLimited) as e:
+        p.complete("m", REQ)
+    assert e.value.quota == {
+        "id": "GenerateRequestsPerDayPerProjectPerModel-FreeTier",
+        "value": "20",
+    }
+    assert e.value.retry_after == 52758.0
+    for _ in range(2):
+        with pytest.raises(RateLimited) as e:
+            p.complete("m", REQ)
+        assert e.value.quota is None
+
+
+def test_call_defaults_from_config(yaml_file):
+    cfg = load_llm_config(yaml_file, ENV)
+    assert cfg.call_defaults("planner") == {} and cfg.warning_fraction == Decimal("0.8")
+    real = load_llm_config()
+    assert real.call_defaults("planner")["max_tokens"] == 1200

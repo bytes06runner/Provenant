@@ -177,7 +177,9 @@ class GeminiProvider:
             raise LLMError(self.name, model, None, f"transport: {e}") from e
         latency = int((self._clock() - started) * 1000)
         if resp.status_code == 429:
-            raise RateLimited(self.name, model, _error_message(resp), _gemini_retry(resp))
+            raise RateLimited(
+                self.name, model, _error_message(resp), _gemini_retry(resp), _gemini_quota(resp)
+            )
         if resp.status_code >= 400:
             raise LLMError(self.name, model, resp.status_code, _error_message(resp))
         data = resp.json()
@@ -214,6 +216,20 @@ def _error_message(resp: httpx.Response) -> str:
     if isinstance(err, dict):
         return str(err.get("message") or err)[:300]
     return str(err)[:300]
+
+
+def _gemini_quota(resp: httpx.Response) -> dict[str, str] | None:
+    """The violated quota from a 429's QuotaFailure detail, e.g. requests per day = 20."""
+    try:
+        details = resp.json()["error"].get("details", [])
+    except (ValueError, KeyError, AttributeError):
+        return None
+    for d in details:
+        if str(d.get("@type", "")).endswith("QuotaFailure"):
+            for v in d.get("violations", []):
+                if v.get("quotaId") and v.get("quotaValue"):
+                    return {"id": str(v["quotaId"]), "value": str(v["quotaValue"])}
+    return None
 
 
 def _gemini_retry(resp: httpx.Response) -> float | None:

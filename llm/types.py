@@ -140,9 +140,17 @@ class LLMError(Exception):
 class RateLimited(LLMError):
     """429. `retry_after` is the provider's hint in seconds, when it gives one."""
 
-    def __init__(self, provider: str, model: str, message: str, retry_after: float | None) -> None:
+    def __init__(
+        self,
+        provider: str,
+        model: str,
+        message: str,
+        retry_after: float | None,
+        quota: dict[str, str] | None = None,
+    ) -> None:
         super().__init__(provider, model, 429, message)
         self.retry_after = retry_after
+        self.quota = quota  # e.g. {"id": "...PerDay...", "value": "20"} when the provider says
 
 
 class AllTargetsExhausted(Exception):
