@@ -43,6 +43,7 @@ from llm.types import AllTargetsExhausted, Image, LLMError, LLMRequest, LLMRespo
 
 PROMPTS = REPO_ROOT / "llm" / "prompts"
 MODES = ("strict", "schema", "json")
+PLANNER_PROMPT = "planner_v1"  # set by --planner-prompt
 
 MANDATE = {
     "category": "trail-running-shoes",
@@ -165,12 +166,12 @@ def save(part: str, model: str, data: dict[str, Any]) -> Path:
 # ---- parts ---------------------------------------------------------------------------
 
 
-def planner_request(mode: str, temperature: str, max_tokens: int) -> LLMRequest:
+def planner_request(mode: str, temperature: str, max_tokens: int, review_url: str) -> LLMRequest:
     schema = json.loads(SCHEMA_PATH.read_text())
-    system = (PROMPTS / "planner_v1.md").read_text()
+    system = (PROMPTS / f"{PLANNER_PROMPT}.md").read_text()
     if mode == "json":
         system += "\n\n## Plan JSON schema\n\n" + json.dumps(schema)
-    context = {"mandate": MANDATE, "review_url": spike_config()["s9"]["review_url"]}
+    context = {"mandate": MANDATE, "review_url": review_url}
     return LLMRequest(
         messages=(Message("system", system), Message("user", json.dumps(context, indent=2))),
         temperature=temperature,
@@ -189,7 +190,9 @@ def run_structured(router: LLMRouter, target: Target, s9: dict[str, Any]) -> dic
     mode = None
     for candidate in MODES:
         try:
-            req = planner_request(candidate, s9["planner_temperature"], s9["max_tokens_planner"])
+            req = planner_request(
+                candidate, s9["planner_temperature"], s9["max_tokens_planner"], s9["review_url"]
+            )
             first, used = patient(router, req, options)
             mode = candidate
             break
@@ -203,9 +206,11 @@ def run_structured(router: LLMRouter, target: Target, s9: dict[str, Any]) -> dic
     trials = []
     responses = [first]
     for i in range(1, int(s9["trials"])):
-        req = planner_request(mode, s9["planner_temperature"], s9["max_tokens_planner"])
+        req = planner_request(
+            mode, s9["planner_temperature"], s9["max_tokens_planner"], s9["review_url"]
+        )
         try:
-            r, _ = call(router, req, options if used else {})
+            r, _ = patient(router, req, options if used else {}, attempts=8, pause=20)
             responses.append(r)
         except (LLMError, AllTargetsExhausted) as e:
             trials.append({"trial": i, "error": str(e)[:300]})
@@ -298,8 +303,12 @@ def run_determinism(router: LLMRouter, target: Target, s9: dict[str, Any]) -> di
         outs, usages, fps, err = [], [], set(), None
         for _ in range(int(s9["determinism_calls"])):
             try:
-                r, used = call(
-                    router, extractor_request(seed, mode, s9["max_tokens_extractor"]), options
+                r, used = patient(
+                    router,
+                    extractor_request(seed, mode, s9["max_tokens_extractor"]),
+                    options,
+                    attempts=8,
+                    pause=20,
                 )
             except (LLMError, AllTargetsExhausted) as e:
                 err = str(e)[:300]
@@ -403,7 +412,7 @@ def run_vision(router: LLMRouter, target: Target, s9: dict[str, Any]) -> dict[st
                 structured="schema",
             )
             try:
-                r, _ = call(router, req, options)
+                r, _ = patient(router, req, options, attempts=8, pause=20)
                 doc = json.loads(strip_fences(r.text))
                 correct = doc["matches_required_color"] == (truth == "black")
                 results.append(
@@ -531,7 +540,10 @@ def main() -> int:
     p.add_argument("part", choices=["structured", "determinism", "vision", "report"])
     p.add_argument("--model", help="model id (must be a role's primary model)")
     p.add_argument("--k", type=int, help="samples per coalition for the report (default config)")
+    p.add_argument("--planner-prompt", default="planner_v1", help="prompt file in llm/prompts")
     args = p.parse_args()
+    global PLANNER_PROMPT
+    PLANNER_PROMPT = args.planner_prompt
     s9 = spike_config()["s9"]
     cfg = load_llm_config()
     engine = create_engine(repo_sqlite_url(s9["store_url"]))
@@ -555,7 +567,11 @@ def main() -> int:
     fn = {"structured": run_structured, "determinism": run_determinism, "vision": run_vision}
     data = fn[args.part](router, target, s9)
     data["wall_seconds"] = round(time.monotonic() - started, 1)
-    save(args.part, args.model, data)
+    data["planner_prompt"] = PLANNER_PROMPT
+    part = (
+        args.part if args.planner_prompt == "planner_v1" else f"{args.part}_{args.planner_prompt}"
+    )
+    save(part, args.model, data)
     return 0
 
 
