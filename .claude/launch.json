@@ -2,6 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "web", "run", "dev", "--", "--port", "3000"],
+      "port": 3000
+    },
+    {
       "name": "s8-jssdk",
       "runtimeExecutable": ".venv/bin/python",
       "runtimeArgs": ["spikes/s8_jssdk/server.py"],

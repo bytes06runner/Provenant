@@ -1,0 +1,113 @@
+@import "tailwindcss";
+
+/* Provenant design tokens (docs/design.md): a Roman tribunal, set like a ledger. */
+:root {
+  --bg: #f4f1ea;
+  --surface: #eae4d8;
+  --surface-2: #e1d9c9;
+  --line: #d3c9b5;
+  --text: #1c1a17;
+  --muted: #5f584d;
+  --accent: #b55d34;
+  --accent-ink: #fffaf3;
+  --laurel: #5f6e4c;
+  --slate: #5d6670;
+  --crimson: #9b2f3a;
+  --display: #1c1a17;
+  --focus: #b55d34;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1a1816;
+    --surface: #24211e;
+    --surface-2: #2d2925;
+    --line: #3b3631;
+    --text: #f1ece2;
+    --muted: #b3aa9b;
+    --accent: #e08a62;
+    --accent-ink: #1a1816;
+    --laurel: #a9b891;
+    --slate: #a4adb8;
+    --crimson: #e5868f;
+    --display: #b9a6d3;
+    --focus: #e08a62;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #1a1816;
+  --surface: #24211e;
+  --surface-2: #2d2925;
+  --line: #3b3631;
+  --text: #f1ece2;
+  --muted: #b3aa9b;
+  --accent: #e08a62;
+  --accent-ink: #1a1816;
+  --laurel: #a9b891;
+  --slate: #a4adb8;
+  --crimson: #e5868f;
+  --display: #b9a6d3;
+  --focus: #e08a62;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-laurel: var(--laurel);
+  --color-slate: var(--slate);
+  --color-crimson: var(--crimson);
+  --color-display: var(--display);
+  --font-display: var(--font-instrument), "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+}
+
+.display {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  color: var(--display);
+  letter-spacing: -0.01em;
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* React Flow follows the tokens */
+.react-flow {
+  --xy-background-color: transparent;
+  --xy-edge-stroke: var(--line);
+}
+.react-flow__attribution {
+  background: transparent !important;
+  color: var(--muted) !important;
+}
