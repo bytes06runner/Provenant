@@ -17,38 +17,15 @@ import argparse
 import dataclasses
 import json
 import sys
-import uuid
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-import httpx  # noqa: E402
-from sqlalchemy import create_engine  # noqa: E402
-
-from blackbox.recorder import CustomIdFormat, FlightRecorder  # noqa: E402
 from lineage.labels import untrusted  # noqa: E402
-from lineage.nonces import SqlNonceRegistry  # noqa: E402
-from lineage.purchase import PurchaseSession  # noqa: E402
-from lineage.signing import key_id  # noqa: E402
-from lineage.toolbox import HttpToolbox  # noqa: E402
-from lineage.vault import Address, AddressVault  # noqa: E402
-from llm import build_router, roles  # noqa: E402
-from merchants.keystore import load_or_create  # noqa: E402
-from merchants.registry import key_registry, load_records  # noqa: E402
-from paypal.client import PayPalClient  # noqa: E402
-from paypal.config import (  # noqa: E402
-    http_settings,
-    load_env,
-    load_yaml,
-    merchant_credentials,
-    require_env,
-)
-from paypal.ledger import RequestLedger  # noqa: E402
-
-VAR = REPO_ROOT / "var"
+from lineage.runtime import Runtime  # noqa: E402
+from llm import roles  # noqa: E402
 
 
 def say(title: str, data: Any = None) -> None:
@@ -77,62 +54,14 @@ def main() -> int:
     )
     args = ap.parse_args()
 
-    load_env()
-    app_cfg = load_yaml("app.yaml")
-    settings = app_cfg["purchase"]
-    users = load_yaml("demo/users.yaml")["users"]
-    user = users[args.user]
-    records = load_records(VAR / "registry.json")
-    engine = create_engine(f"sqlite:///{VAR / 'provenant.db'}")
-    recorder = FlightRecorder(engine)
-    session_id = f"s-{uuid.uuid4().hex[:12]}"
-    holder: dict[str, PurchaseSession] = {}
-
-    def record(event_type: str, payload: dict[str, Any]) -> None:
-        holder["s"].record(event_type, payload)
-
-    router = build_router(engine, record=record)
-    ledger = RequestLedger.from_url(f"sqlite:///{VAR / 'ledger.db'}")
-    http = httpx.Client(timeout=30)
-    toolbox = HttpToolbox(
-        merchants={k: r.base_url for k, r in records.items()},
-        keys=key_registry(records),
-        router=router,
-        http=http,
-        put_blob=recorder.put_blob,
-        record=record,
-        seed=int(settings["q_llm_seed"]),
-    )
-    vault = AddressVault()
-    for ref, addr in user["addresses"].items():
-        vault.save_confirmed(args.user, ref, Address(**addr))
-    user_key = load_or_create(VAR / "keys" / "users", args.user)
-    cid = app_cfg["paypal"]["custom_id"]
-    spec = load_yaml("catalog/trail_running.yaml")
-    session = PurchaseSession(
-        session_id=session_id,
-        recorder=recorder,
-        router=router,
-        toolbox=toolbox,
-        vault=vault,
-        user_id=args.user,
-        user_key=user_key,
-        user_keys={key_id(user_key.public_key()): user_key.public_key()},
-        nonces=SqlNonceRegistry(engine),
-        custom_id_format=CustomIdFormat(
-            cid["prefix"], int(cid["hash_hex_chars"]), int(cid["max_length"])
-        ),
-        paypal=lambda mid: PayPalClient(merchant_credentials(mid), http_settings(), ledger=ledger),
-        settings=settings,
-        category_spec=spec,
-        now=lambda: datetime.now(UTC),
-        experience_context={
-            "user_action": "CONTINUE",
-            "return_url": require_env("PAYPAL_RETURN_URL"),
-            "cancel_url": require_env("PAYPAL_CANCEL_URL"),
-        },
-    )
-    holder["s"] = session
+    rt = Runtime.load()
+    session = rt.new_session(args.user)
+    session_id = session.session_id
+    toolbox = session.toolbox
+    records = rt.records
+    recorder = rt.recorder
+    spec = rt.spec
+    user = rt.users[args.user]
     say(f"Session {session_id}")
 
     # 1. mandate
