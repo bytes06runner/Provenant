@@ -70,3 +70,20 @@ s5:
   simulate_event_type: PAYMENT.AUTHORIZATION.VOIDED
   payout_amount: "1.00"
   payout_receiver_env: PAYPAL_BUYER_A_EMAIL
+
+s9:
+  # LLM layer validation. Models come from the role chains in .env, not from here.
+  roles: [planner, mandate, extractor, vision, narrator, baseline, reference_policy]
+  trials: 20
+  planner_temperature: "0.7"      # replays sample the planner above zero
+  determinism_calls: 5
+  seed: 42
+  max_tokens_planner: 4096
+  max_tokens_extractor: 1024
+  vision_trials: 3
+  review_url: "https://reviews.example/trail-runner"
+  # Lower reasoning effort to fit free-tier token limits; recorded in results.
+  options:
+    groq: {reasoning_effort: low}
+    gemini: {thinkingConfig: {thinkingLevel: low}}
+  store_url: "sqlite:///spikes/out/s9_llm.db"
