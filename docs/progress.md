@@ -568,8 +568,16 @@ Run `s-9315c6f5ddf0` (merchant simulator live on port 8710, real LLMs, real PayP
    checkout (event 41), invoice `pv-s-9315c6f5ddf0`. PayPal stored the custom_id (verified by GET).
 8. **Flight Recorder:** 44 events; chain verifies; the custom_id resolves to event 41.
 
-Pending: buyer approval of the order, then authorization (`scripts/authorize_order.py --session
-s-9315c6f5ddf0`).
+9. **Approved and authorized:** buyer A approved in PayPal; authorization `58R693130R3710546`,
+   status `CREATED`, expires 2026-11-03, and it carries the same custom_id
+   `pv:098aa1b905c6e4dc36b9b0c6d0f9f69b` (verified by GET). Chain of 45 events verifies; the
+   custom_id still resolves to event 41. That event is the second blocked hijack: the custom_id
+   anchors the chain head at checkout, which commits to every earlier event, the refused attacks
+   included.
+
+**Phase 1 acceptance status:** a benign purchase completed in sandbox with the session hash in
+custom_id (order, authorization); attacker payee-swaps were blocked live with recorded violation
+paths; unit tests cover label propagation and every contract.
 
 Bug found during the run: violations with label UNTRUSTED were recorded with `"label": null`
 because `Label.UNTRUSTED` is the enum's zero value and a truthiness check dropped it. Enforcement
