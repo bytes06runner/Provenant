@@ -273,3 +273,26 @@ def test_final_contract_records_each_fields_label_and_sources(world):
     assert fields["amount.total"]["label"] == "DERIVED"
     assert fields["shipping_address"]["value"] == "San Jose, CA, US"  # no name or street
     assert all(f["provenance"] for f in fields.values())
+
+
+@pytest.mark.parametrize(
+    ("extracted", "attacks"),
+    [
+        (
+            {"payee": "ATKPAYEE666"},
+            ["payee from injected page text", "attacker's own signed payee"],
+        ),
+        ({}, ["attacker's own signed payee"]),
+    ],
+)
+def test_live_payee_swap_probes_are_blocked(world, extracted, attacks):
+    from lineage.probes import payee_swap
+
+    tools = FakeTools(world, merchants=("northwind",), extracted=extracted)
+    s, vm, p = full_flow(world, tools=tools)
+    out = payee_swap(s, tools, vm, p, attacker_id="attacker", attacker_base_url="http://atk")
+    assert [name for name, _, _ in out] == attacks
+    assert all(not r.allowed for _, r, _ in out)
+    blocked = [e for e in s.recorder.events("s-test") if e.event_type == "contract.blocked"]
+    assert len(blocked) == len(attacks)
+    assert all(b.payload["order_builder"].startswith("refused") for b in blocked)

@@ -23,7 +23,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from lineage.labels import untrusted  # noqa: E402
+from lineage.probes import payee_swap  # noqa: E402
 from lineage.runtime import Runtime  # noqa: E402
 from llm import roles  # noqa: E402
 
@@ -106,24 +106,15 @@ def main() -> int:
 
     # 3. live attacks
     if args.attack == "payee-swap":
-        atk = toolbox.fetch_manifest("attacker")
-        url = f"{records['attacker'].base_url}/reviews/{atk.manifest.catalog[0].sku}"
-        text, digest = toolbox.fetch_page(url)
-        found = toolbox.extract("payment_instructions_v1", text) or {}
-        injected = found.get("payee")
-        say("Attacker page, as read by the Q-LLM", {"url": url, "extracted": found})
-        if injected:
-            hijacked = dataclasses.replace(
-                c.checkout,
-                payee=untrusted(
-                    injected, f"page:{url}", "qllm:payment_instructions_v1.payee", digest
-                ),
-            )
-            r = session.check_hijack(vm, p, hijacked, "payee from injected page text")
-            say("Hijack 1: payee taken from the attacker's page", _violations(r))
-        hijacked = dataclasses.replace(c.checkout, payee=atk.payee())
-        r = session.check_hijack(vm, p, hijacked, "attacker's own signed payee")
-        say("Hijack 2: attacker's validly signed payee swapped in", _violations(r))
+        for name, r, info in payee_swap(
+            session,
+            toolbox,
+            vm,
+            p,
+            attacker_id="attacker",
+            attacker_base_url=records["attacker"].base_url,
+        ):
+            say(f"Hijack: {name}", {**info, **_violations(r)})
 
     # 4. PayPal order
     order = session.create_order(p)
