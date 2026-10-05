@@ -1,4 +1,4 @@
-"""Exact Shapley attribution and bootstrap CIs."""
+"""Exact Shapley attribution and Jeffreys intervals propagated through the Shapley map."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ def v_from(fn) -> dict:
 def run(samples, **kw):
     return attribute(
         samples,
-        resamples=kw.get("resamples", 400),
+        draws=kw.get("draws", 2000),
         ci_level=F(95, 100),
         max_ci_width=kw.get("width", F(35, 100)),
         seed="case-1",
@@ -99,13 +99,28 @@ def test_nothing_attributable():
     assert res.shares is None and res.escalate and res.majority() is None and res.leaders() == []
 
 
-def test_deterministic_samples_give_zero_width_intervals():
+def test_unanimous_samples_do_not_give_zero_width_intervals():
+    """4 of 4 bad is evidence, not certainty: Jeffreys keeps a small chance of a good purchase."""
     samples = {c: [0] * 4 if "U" in c else [1] * 4 for c in coalitions()}
     res = run(samples)
     assert res.majority() == "U" and not res.escalate
-    assert res.ci["U"] == (F(1), F(1)) and res.ci["M"] == (F(0), F(0))
+    assert res.shares == {"U": F(1), "M": F(0), "A": F(0)}
+    lo, hi = res.ci["U"]
+    assert F(6, 10) < lo < hi == 1 and res.ci["M"][0] == 0 < res.ci["M"][1] < F(3, 10)
+    vlo, vhi = res.v_ci[frozenset()]
+    assert F(1, 2) < vlo < vhi < 1  # Beta(4.5, 0.5): never exactly 1
     d = res.to_dict()
     assert d["shares"] == {"U": "1.0000", "M": "0.0000", "A": "0.0000"} and d["k"] == 4
+    assert d["interval"] == "jeffreys" and set(d["v_ci"]) == {label(c) for c in coalitions()}
+
+
+def test_more_samples_narrow_the_intervals():
+    def width(k):
+        samples = {c: [0] * k if "A" in c else [1] * k for c in coalitions()}
+        lo, hi = run(samples).ci["A"]
+        return hi - lo
+
+    assert width(16) < width(8) < width(4) < F(35, 100)
 
 
 def test_noisy_samples_widen_intervals_and_escalate():
@@ -115,9 +130,9 @@ def test_noisy_samples_widen_intervals_and_escalate():
     assert res.escalate and "above" in res.reason
 
 
-def test_bootstrap_is_reproducible():
+def test_intervals_are_reproducible():
     noisy = {c: [1, 0, 1, 1] if "M" not in c else [0, 1, 0, 0] for c in coalitions()}
-    assert run(noisy).ci == run(noisy).ci
+    assert run(noisy).ci == run(noisy).ci and run(noisy).v_ci == run(noisy).v_ci
 
 
 def test_majority_tie_breaks_by_player_order():
@@ -162,19 +177,3 @@ def test_hand_computed_mixed_case():
 def test_coalitions_are_all_subsets():
     expected = {frozenset(c) for r in range(4) for c in combinations(PLAYERS, r)}
     assert set(coalitions()) == expected
-
-
-def test_paired_bootstrap_resamples_sample_indices_jointly():
-    noisy = {c: [1, 0, 1, 1] if "M" not in c else [0, 1, 0, 0] for c in coalitions()}
-    a = attribute(
-        noisy, resamples=300, ci_level=F(95, 100), max_ci_width=F(1), seed="s", paired=True
-    )
-    b = attribute(
-        noisy, resamples=300, ci_level=F(95, 100), max_ci_width=F(1), seed="s", paired=True
-    )
-    assert a.ci == b.ci and a.shares == run(noisy).shares
-    with pytest.raises(AttributionError, match="same k"):
-        uneven = {**noisy, frozenset(): [1, 1]}
-        attribute(
-            uneven, resamples=10, ci_level=F(95, 100), max_ci_width=F(1), seed="s", paired=True
-        )

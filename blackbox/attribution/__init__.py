@@ -11,15 +11,20 @@ w(S) = v({}) - v(S). With three players there are 8 coalitions, so the Shapley v
 
     phi_i = sum over S not containing i of  |S|! (n - |S| - 1)! / n!  *  (v(S) - v(S + i))
 
-Fault shares are the positive Shapley values normalized to sum to 1. Uncertainty comes from the
-finite samples: bootstrap resamples each coalition's outcomes with replacement and recomputes the
-shares, giving percentile confidence intervals. When replays use common random numbers (sample j
-of coalitions that give the planner identical input share one plan, see blackbox/replay), the
-samples are paired across coalitions and the bootstrap resamples sample indices jointly.
-If any interval is wider than the configured threshold, or nothing can be attributed, the case
+Fault shares are the positive Shapley values normalized to sum to 1.
+
+Uncertainty (decided 2026-10-06, replacing a bootstrap): each coalition's v(S) gets a Jeffreys
+posterior, Beta(x + 1/2, k - x + 1/2) for x bad outcomes in k samples. Seeded draws from the
+eight posteriors are pushed through the exact Shapley map, and the percentiles of the resulting
+shares are the reported intervals. Unlike a bootstrap, 4 bad out of 4 does not collapse to a
+zero-width interval: with k = 4 the data cannot rule out a small chance of a good purchase.
+Coalitions are treated as independent, which is conservative when replays share plans (common
+random numbers pair them). Per-coalition Jeffreys intervals for v(S) are reported too. If any
+share interval is wider than the configured threshold, or nothing can be attributed, the case
 escalates to human review instead of an automatic remedy.
 
-All arithmetic is exact (fractions). No LLM ever computes these numbers.
+Point estimates are exact (fractions); the interval draws use seeded floating point. No LLM
+ever computes these numbers.
 """
 
 from __future__ import annotations
@@ -27,7 +32,7 @@ from __future__ import annotations
 import hashlib
 import random
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from fractions import Fraction
 from itertools import combinations
 from math import factorial
@@ -91,12 +96,6 @@ def means(samples: Mapping[Coalition, Sequence[int]]) -> dict[Coalition, Fractio
     return out
 
 
-def _percentile(sorted_xs: Sequence[Fraction], q: Fraction) -> Fraction:
-    """Nearest-rank percentile (q in [0, 1])."""
-    idx = min(len(sorted_xs) - 1, max(0, int(q * len(sorted_xs))))
-    return sorted_xs[idx]
-
-
 @dataclass(frozen=True)
 class Attribution:
     k: int
@@ -107,6 +106,8 @@ class Attribution:
     ci_level: Fraction
     escalate: bool
     reason: str
+    v_ci: dict[Coalition, tuple[Fraction, Fraction]] = field(default_factory=dict)
+    interval: str = "jeffreys"
 
     def majority(self) -> str | None:
         if self.shares is None:
@@ -133,59 +134,84 @@ class Attribution:
             "shares": {p: d(x) for p, x in self.shares.items()} if self.shares else None,
             "ci": {p: [d(lo), d(hi)] for p, (lo, hi) in self.ci.items()},
             "ci_level": d(self.ci_level),
+            "interval": self.interval,
+            "v_ci": {
+                label(c): [d(lo), d(hi)]
+                for c, (lo, hi) in sorted(self.v_ci.items(), key=lambda kv: len(kv[0]))
+            },
             "escalate": self.escalate,
             "reason": self.reason,
             "majority": self.majority(),
         }
 
 
+def _shares_float(v: Mapping[Coalition, float]) -> dict[str, float] | None:
+    n = len(PLAYERS)
+    phi = {}
+    for i in PLAYERS:
+        others = [p for p in PLAYERS if p != i]
+        total = 0.0
+        for r in range(n):
+            w = factorial(r) * factorial(n - r - 1) / factorial(n)
+            for s in combinations(others, r):
+                S = frozenset(s)
+                total += w * (v[S] - v[S | {i}])
+        phi[i] = max(total, 0.0)
+    z = sum(phi.values())
+    return {p: x / z for p, x in phi.items()} if z > 1e-12 else None
+
+
+def _q(sorted_xs: Sequence[float], q: Fraction) -> Fraction:
+    idx = min(len(sorted_xs) - 1, max(0, int(q * len(sorted_xs))))
+    return Fraction(sorted_xs[idx]).limit_denominator(10_000)
+
+
 def attribute(
     samples: Mapping[Coalition, Sequence[int]],
     *,
-    resamples: int,
+    draws: int,
     ci_level: Fraction,
     max_ci_width: Fraction,
     seed: str,
-    paired: bool = False,
 ) -> Attribution:
-    """Shapley shares with bootstrap percentile CIs. `seed` makes the bootstrap reproducible.
-    `paired`: sample j is one draw across all coalitions (common random numbers)."""
+    """Shapley shares with Jeffreys posterior intervals propagated through the Shapley map.
+    `seed` makes the draws reproducible."""
     v = means(samples)
     phi = shapley(v)
     sh = shares(phi)
-    ks = {len(xs) for xs in samples.values()}
-    k = min(ks)
-    if paired and len(ks) != 1:
-        raise AttributionError("paired samples need the same k in every coalition")
+    k = min(len(xs) for xs in samples.values())
+    alpha = (1 - ci_level) / 2
+    rng = random.Random(int(hashlib.sha256(seed.encode()).hexdigest()[:16], 16))  # noqa: S311
+    counts = {c: (sum(xs), len(xs)) for c, xs in samples.items()}
+    v_draws: dict[Coalition, list[float]] = {c: [] for c in samples}
+    s_draws: dict[str, list[float]] = {p: [] for p in PLAYERS}
+    for _ in range(draws):
+        vd = {c: rng.betavariate(x + 0.5, n - x + 0.5) for c, (x, n) in counts.items()}
+        for c, x in vd.items():
+            v_draws[c].append(x)
+        sd = _shares_float(vd)
+        for p in PLAYERS:
+            s_draws[p].append(sd[p] if sd else 0.0)
+    v_ci = {}
+    for c, xs in v_draws.items():
+        xs.sort()
+        v_ci[c] = (_q(xs, alpha), _q(xs, 1 - alpha))
+    ci = {}
+    for p in PLAYERS:
+        xs = sorted(s_draws[p])
+        ci[p] = (_q(xs, alpha), _q(xs, 1 - alpha))
     if sh is None:
-        zero = {p: (Fraction(0), Fraction(0)) for p in PLAYERS}
         return Attribution(
             k,
             v,
             phi,
             None,
-            zero,
+            ci,
             ci_level,
             True,
             "no player's correction reduces the chance of a bad purchase",
+            v_ci,
         )
-
-    rng = random.Random(int(hashlib.sha256(seed.encode()).hexdigest()[:16], 16))  # noqa: S311
-    draws: dict[str, list[Fraction]] = {p: [] for p in PLAYERS}
-    for _ in range(resamples):
-        if paired:
-            idx = [rng.randrange(k) for _ in range(k)]
-            boot = {c: [xs[i] for i in idx] for c, xs in samples.items()}
-        else:
-            boot = {c: [rng.choice(xs) for _ in xs] for c, xs in samples.items()}
-        bs = shares(shapley(means(boot)))
-        for p in PLAYERS:
-            draws[p].append(bs[p] if bs else Fraction(0))
-    alpha = (1 - ci_level) / 2
-    ci = {}
-    for p in PLAYERS:
-        xs = sorted(draws[p])
-        ci[p] = (_percentile(xs, alpha), _percentile(xs, 1 - alpha))
     widest = max(hi - lo for lo, hi in ci.values())
     escalate = widest > max_ci_width
     reason = (
@@ -194,4 +220,4 @@ def attribute(
         if escalate
         else "attribution is precise enough for an automatic remedy proposal"
     )
-    return Attribution(k, v, phi, sh, ci, ci_level, escalate, reason)
+    return Attribution(k, v, phi, sh, ci, ci_level, escalate, reason, v_ci)

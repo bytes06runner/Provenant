@@ -63,7 +63,7 @@ NARRATION = {
     "holding": "Fault is shared.",
     "remedy": "See the remedy.",
 }
-ATT_CFG = {"bootstrap_resamples": 200, "ci_level": "0.95", "max_ci_width_for_auto": "0.35"}
+ATT_CFG = {"posterior_draws": 500, "ci_level": "0.95", "max_ci_width_for_auto": "0.35"}
 
 
 class Router:
@@ -275,7 +275,7 @@ def test_misrepresentation_the_user_also_left_unstated_is_split_and_refunded(tmp
         clarified={"forbidden_attributes": {"material": ["leather"]}},
         reported_attributes={"material": "leather"},
     )
-    r = run_case(c.deps, s, complaint, k=2, approve=True)
+    r = run_case(c.deps, s, complaint, k=4, approve=True)
     assert r.facts.misrepresentations == {"material": {"signed": "mesh", "actual": "leather"}}
     assert r.attribution["v"]["observed"] == "1.0000" and r.attribution["v"]["do(U,M)"] == "0.0000"
     assert r.attribution["shares"] == {"U": "0.5000", "M": "0.5000", "A": "0.0000"}
@@ -287,7 +287,7 @@ def test_misrepresentation_the_user_also_left_unstated_is_split_and_refunded(tmp
     assert r.ruling["source"] == "fake/narrator-model"
     assert r.evidence_pdf.read_bytes().startswith(b"%PDF")
     kinds = events(c, r.case_id)
-    assert kinds.count("replay.run") == 16
+    assert kinds.count("replay.run") == 32
     for k in (
         "complaint.filed",
         "mandate.clarified",
@@ -336,7 +336,7 @@ def test_agent_ignoring_cheapest_is_paid_back_by_the_operator(tmp_path, world):
         preference="lowest_total",
         max_unit_price="130.00",
     )
-    r = run_case(c.deps, s, Complaint("I asked for the cheapest.", {}, {}), k=2, approve=True)
+    r = run_case(c.deps, s, Complaint("I asked for the cheapest.", {}, {}), k=4, approve=True)
     assert r.attribution["shares"]["A"] == "1.0000"
     assert [(x["kind"], x["amount"], x["party"]) for x in r.executed] == [
         ("payout", "26.00", "operator")
@@ -513,6 +513,23 @@ def misrep_case(tmp_path, world, cfg):
         reported_attributes={"material": "leather"},
     )
     return c, run_case(c.deps, s, complaint, k=3, approve=False)
+
+
+def test_too_few_samples_go_to_a_human(tmp_path, world):
+    c = make(tmp_path, world, {})
+    shipped = {"color": "black", "size_us": "10", "material": "leather"}
+    s = c.purchase(
+        forbidden_attributes={},
+        shipped={"shipped_sku": "TRAIL-BLK-10", "shipped_attributes": shipped},
+    )
+    complaint = Complaint(
+        "They are leather.",
+        clarified={"forbidden_attributes": {"material": ["leather"]}},
+        reported_attributes={"material": "leather"},
+    )
+    r = run_case(c.deps, s, complaint, k=2, approve=True)
+    assert r.attribution["escalate"] and r.plan.status == "needs_human_review"
+    assert r.executed == [] and "above" in r.plan.notes[0]
 
 
 def test_shared_plans_halve_planner_calls_and_keep_the_answer(tmp_path, world):

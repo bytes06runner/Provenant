@@ -18,7 +18,8 @@ mandate and the review URL, never merchant content, so do(S) and do(S + M) give 
 input. With sharing on, sample j of every coalition whose planner input is identical uses one
 plan, and only the content served to the interpreter differs. Each coalition still gets k
 samples from the same distribution; the M contrast becomes paired, which halves planner calls
-and tightens the comparison. The bootstrap then resamples sample indices jointly.
+and tightens the comparison. The Jeffreys intervals treat coalitions as independent, which is
+conservative for paired samples.
 
 Each replay is judged against the clarified intent using the best-known truth: established facts
 for the purchased item, corrected merchant data otherwise. A replay that buys nothing is not a bad

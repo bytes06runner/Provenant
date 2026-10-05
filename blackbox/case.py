@@ -5,7 +5,7 @@
     sign the clarified intent; check the photo (vision, escalating only when needed)
     establish facts; read the order's live state from PayPal
     fulfillment fault -> merchant owns 100% (no replay needed)
-    decision wrong    -> replay every coalition k times, exact Shapley with bootstrap CIs
+    decision wrong    -> replay every coalition k times, exact Shapley with Jeffreys intervals
     remedy plan (deterministic), ruling text (numbers only), evidence pack PDF
     with approval only: execute on PayPal, reconcile until final, report discrepancies
 
@@ -308,11 +308,10 @@ def run_case(
             )
             attribution = attribute(
                 samples,
-                resamples=int(cfg["bootstrap_resamples"]),
+                draws=int(cfg["posterior_draws"]),
                 ci_level=Fraction(str(cfg["ci_level"])),
                 max_ci_width=Fraction(str(cfg["max_ci_width_for_auto"])),
                 seed=case,
-                paired=crn,
             )
         else:
             note = f"the purchase satisfies the clarified intent ({why}); no replay needed"

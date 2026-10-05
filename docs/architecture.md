@@ -159,8 +159,8 @@ identical planner input shares one plan; plans are keyed by exactly what the pla
 
 - Each coalition still gets k samples from the same distribution, so v(S) is unchanged in
   expectation. The M comparison becomes paired, which removes planner noise from it.
-- The bootstrap resamples sample indices jointly across coalitions (paired bootstrap), which is
-  valid for paired and for independent samples.
+- Intervals (Jeffreys posteriors per coalition, propagated through the Shapley map) treat
+  coalitions as independent, which is conservative for paired samples.
 - It halves planner and reference-policy calls: 4 distinct planner inputs per sample instead of
   8. A k=8 case needs 16 reference-policy calls (about 50k tokens on gpt-oss-120b) instead of 32.
 - A planning failure is shared as well (the same input fails the same way), and every
