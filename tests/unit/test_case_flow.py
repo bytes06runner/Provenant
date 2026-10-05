@@ -614,3 +614,48 @@ def test_rerender_reads_overpayment_from_the_recorded_outcome(tmp_path, world):
     run_case(c.deps, s, Complaint("I asked for the cheapest.", {}, {}), k=4, approve=False)
     again = rerender_case(c.deps, s)
     assert again.plan.harm == "overpaid" and again.plan.r == "26.00"
+
+
+# ---- operator approval after the fact ---------------------------------------------------------
+
+
+def test_operator_approves_a_proposed_remedy_later_and_only_once(tmp_path, world):
+    from blackbox.case import approve_case
+
+    c = make(tmp_path, world, {})
+    shipped = {"color": "black", "size_us": "10", "material": "leather"}
+    s = c.purchase(
+        forbidden_attributes={},
+        shipped={"shipped_sku": "TRAIL-BLK-10", "shipped_attributes": shipped},
+    )
+    complaint = Complaint(
+        "They are leather.",
+        clarified={"forbidden_attributes": {"material": ["leather"]}},
+        reported_attributes={"material": "leather"},
+    )
+    r = run_case(c.deps, s, complaint, k=4, approve=False)
+    assert r.plan.status == "proposed" and r.executed == [] and c.sandbox.posts == []
+    a = approve_case(c.deps, s, by="ops@example")
+    assert [(x["kind"], x["resource_id"], x["amount"]) for x in a.executed] == [
+        ("refund", "R1", "52.00")
+    ]
+    assert a.settled is True and a.attribution["shares"]["M"] == "0.5000"
+    again = approve_case(c.deps, s, by="ops@example")  # double click: no second refund
+    assert [x["resource_id"] for x in again.executed] == ["R1"]
+    assert c.sandbox.posts.count("/v2/payments/captures/C1/refund") == 1
+    kinds = [e.event_type for e in c.recorder.events(r.case_id)]
+    assert kinds.count("remedy.approved") == 2 and kinds[-1] == "case.closed"
+    approved = next(e for e in c.recorder.events(r.case_id) if e.event_type == "remedy.approved")
+    assert approved.payload["by"] == "ops@example"
+
+
+def test_nothing_to_approve(tmp_path, world):
+    from blackbox.case import approve_case
+
+    c = make(tmp_path, world, {}, captured=None)
+    s = c.purchase(captured=False, blob=False)
+    with pytest.raises(CaseError, match="no remedy has been proposed"):
+        approve_case(c.deps, s, by="ops")
+    run_case(c.deps, s, Complaint("Just checking.", {}, {}), k=1, approve=False)
+    with pytest.raises(CaseError, match="no_remedy"):
+        approve_case(c.deps, s, by="ops")

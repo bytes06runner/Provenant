@@ -365,25 +365,46 @@ def run_case(
     plan = result.plan
 
     if approve and plan.status == "proposed":
-        record("remedy.approved", {"by": "operator", "plan": plan.to_dict()})
-        result.executed = execute(
-            plan,
-            case_id=case,
-            merchant_id=purchase.merchant_id,
-            authorization_id=state["authorization_id"],
-            capture_id=state["capture_id"],
-            currency=state["currency"],
-            buyer_email=deps.buyer_email,
-            paypal=deps.paypal,
-            poller=deps.poller,
-            record=record,
-        )
-        result.settled = deps.poller.settle(
-            case, max_rounds=deps.max_settle_rounds, sleep=deps.sleep
-        )
-        result.discrepancies = deps.poller.discrepancies(
-            case_id=case, order_id=order_id, app=purchase.merchant_id, caused=deps.caused()
-        )
+        _carry_out(deps, case, purchase, order_id, plan, state, record, result, by="operator")
+    _close(record, plan, result)
+    return result
+
+
+def _carry_out(
+    deps: CaseDeps,
+    case: str,
+    purchase: PurchaseRecord,
+    order_id: str,
+    plan: RemedyPlan,
+    state: dict[str, Any],
+    record: Callable[[str, dict[str, Any]], None],
+    result: CaseResult,
+    *,
+    by: str,
+) -> None:
+    """Execute an approved plan on PayPal, reconcile until final, report discrepancies."""
+    record("remedy.approved", {"by": by, "plan": plan.to_dict()})
+    result.executed = execute(
+        plan,
+        case_id=case,
+        merchant_id=purchase.merchant_id,
+        authorization_id=state["authorization_id"],
+        capture_id=state["capture_id"],
+        currency=state["currency"],
+        buyer_email=deps.buyer_email,
+        paypal=deps.paypal,
+        poller=deps.poller,
+        record=record,
+    )
+    result.settled = deps.poller.settle(case, max_rounds=deps.max_settle_rounds, sleep=deps.sleep)
+    result.discrepancies = deps.poller.discrepancies(
+        case_id=case, order_id=order_id, app=purchase.merchant_id, caused=deps.caused()
+    )
+
+
+def _close(
+    record: Callable[[str, dict[str, Any]], None], plan: RemedyPlan, result: CaseResult
+) -> None:
     record(
         "case.closed",
         {
@@ -393,6 +414,45 @@ def run_case(
             "discrepancies": len(result.discrepancies),
         },
     )
+
+
+def approve_case(deps: CaseDeps, session_id: str, *, by: str) -> CaseResult:
+    """A human approves the latest proposed remedy of a recorded case (AUTO_REMEDY=false).
+
+    Live PayPal state is read again first (GETs are the source of truth). Executing is
+    idempotent: each action's operation key is derived from the case, so a second approval
+    returns the same PayPal ids without moving money twice."""
+    rec = deps.recorder
+    purchase = load_purchase(rec, session_id)
+    order_id = purchase.order_id
+    assert order_id is not None
+    case = case_id_for(session_id)
+    events = rec.events(case)
+    proposed = next((e for e in reversed(events) if e.event_type == "remedy.proposed"), None)
+    if proposed is None:
+        raise CaseError(f"{case}: no remedy has been proposed")
+    plan = RemedyPlan.from_dict(proposed.payload)
+    if plan.status != "proposed":
+        raise CaseError(f"{case}: the latest plan is {plan.status}; nothing to approve")
+
+    def latest(t: str) -> dict[str, Any] | None:
+        return next((dict(e.payload) for e in reversed(events) if e.event_type == t), None)
+
+    def record(event_type: str, payload: dict[str, Any]) -> None:
+        rec.append(case, event_type, payload)
+
+    state = _paypal_state(deps, purchase)
+    record("paypal.state", state)
+    result = CaseResult(
+        case,
+        Facts.from_dict(latest("facts.established") or {}),  # recorded before any proposal
+        latest("attribution.revised") or latest("attribution"),
+        plan,
+        latest("ruling") or {},
+        deps.out_dir / f"{case}.pdf",
+    )
+    _carry_out(deps, case, purchase, order_id, plan, state, record, result, by=by)
+    _close(record, plan, result)
     return result
 
 
@@ -642,4 +702,13 @@ def _pack(
     )
 
 
-__all__ = ["Assessment", "CaseDeps", "CaseResult", "assess", "label", "rerender_case", "run_case"]
+__all__ = [
+    "Assessment",
+    "CaseDeps",
+    "CaseResult",
+    "approve_case",
+    "assess",
+    "label",
+    "rerender_case",
+    "run_case",
+]

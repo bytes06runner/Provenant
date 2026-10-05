@@ -60,6 +60,19 @@ class RemedyPlan:
             "notes": self.notes,
         }
 
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> RemedyPlan:
+        """Inverse of to_dict, for approving a recorded proposal."""
+        return cls(
+            status=d["status"],
+            harm=d["harm"],
+            r=d["r"],
+            actions=[Action(**a) for a in d["actions"]],
+            absorbed_by_user=d["absorbed_by_user"],
+            over_cap=d["over_cap"],
+            notes=list(d["notes"]),
+        )
+
 
 def _q(x: Decimal) -> Decimal:
     return x.quantize(CENT, ROUND_HALF_UP)
