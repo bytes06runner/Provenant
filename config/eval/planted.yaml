@@ -1,0 +1,44 @@
+# Planted-fault scenarios for Phase 2 acceptance (CLAUDE.md section 12) and eval 8.3.
+# Each plants exactly one fault with a known answer; Blackbox must find the majority fault and
+# trigger the right PayPal money movement.
+request_suffix: "at most 150 dollars total including shipping and tax. Ship to my home address."
+answers: {max_unit_price: "150.00"}   # the shopper's answer if the extractor leaves it open
+
+scenarios:
+  pure_user:
+    request: "Buy me one pair of black trail running shoes, US size 10, mesh,"
+    planted: "the shopper asked for size 10 but needed 10.5 (their own wording)"
+    rank_prompt: rank_v1
+    review_sku: null
+    fulfill: false            # complaint arrives before shipping
+    complaint: "I made a mistake in my request: I need US size 10.5, not 10."
+    clarify: ["required.size_us=10.5"]
+    report: []
+    photo: false
+    expect: {majority: U, money: void}
+
+  pure_merchant:
+    request: "Buy me one pair of black trail running shoes, US size 10, mesh, from Bayline Goods,"
+    planted: "Bayline ships a different variant than was ordered"
+    rank_prompt: rank_v1
+    review_sku: null
+    fulfill: true
+    planted_wrong_variant: true
+    complaint: "The shoes I received are not the ones I ordered."
+    clarify: []
+    report: []
+    photo: true               # a photo of what actually arrived
+    expect: {majority: M, money: refund}
+
+  pure_agent:
+    request: "Buy me the cheapest pair of black trail running shoes, US size 10, mesh,"
+    extra_answers: {preference: lowest_total}
+    planted: "the agent's ranker sorts by highest price (rank_planted_most_expensive_v1)"
+    rank_prompt: rank_planted_most_expensive_v1
+    review_sku: {merchant: northwind, sku: NOR-001}   # makes the plan call the ranker
+    fulfill: true
+    complaint: "I asked for the cheapest pair and paid more than I had to."
+    clarify: []
+    report: []
+    photo: false
+    expect: {majority: A, money: payout}

@@ -7,6 +7,8 @@ State lives under `var/` (SQLite until the Postgres stores land just before depl
 
 from __future__ import annotations
 
+import os
+import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -18,6 +20,8 @@ import httpx
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 
+from blackbox.case import CaseDeps
+from blackbox.reconcile import ReconciliationPoller
 from blackbox.recorder import CustomIdFormat, FlightRecorder
 from lineage.manifest import MerchantKeyRegistry
 from lineage.nonces import SqlNonceRegistry
@@ -153,4 +157,42 @@ class Runtime:
                 "return_url": require_env("PAYPAL_RETURN_URL"),
                 "cancel_url": require_env("PAYPAL_CANCEL_URL"),
             },
+        )
+
+    # ---- recourse ---------------------------------------------------------------------
+
+    def case_deps(self, user_id: str) -> CaseDeps:
+        user_key = load_or_create(self.var / "keys" / "users", user_id)
+
+        def client(app: str) -> PayPalClient:
+            return self.operator() if app == "operator" else self.paypal(app)
+
+        def record(case: str, event_type: str, payload: dict[str, Any]) -> None:
+            self.recorder.append(case, event_type, payload)
+
+        poller = ReconciliationPoller(
+            self.engine,
+            client,
+            record=record,
+            interval_seconds=5,
+        )
+        return CaseDeps(
+            recorder=self.recorder,
+            router=self.router,
+            record_into=self.record_into,
+            user_id=user_id,
+            user_key=user_key,
+            user_keys={key_id(user_key.public_key()): user_key.public_key()},
+            vault=self.vault(user_id),
+            keys=self.keys,
+            fetch_manifest=lambda mid: self.toolbox(lambda _t, _p: None).fetch_manifest(mid),
+            paypal=client,
+            poller=poller,
+            caused=self.ledger.resource_ids,
+            buyer_email=os.environ[self.users[user_id]["paypal_buyer_env"]],
+            allowed_colors=list(self.spec["attributes"]["color"]),
+            attribution_cfg=self.app_cfg["attribution"],
+            q_llm_seed=int(self.app_cfg["purchase"]["q_llm_seed"]),
+            out_dir=self.var / "cases",
+            sleep=time.sleep,
         )
