@@ -424,3 +424,84 @@ Decisions that came out of Phase 0 and now shape the build:
    refund appeared during dispute settlement).
 6. LLM layer moves to free providers (Groq primary, Gemini secondary); spike S9 validates it
    before any LLM role is built.
+
+## 2026-10-05: Spike S9, free LLM providers (Groq primary, Gemini secondary)
+
+Models and limits were read live from the providers (Groq `/models` and `x-ratelimit-*`
+headers; Gemini `/models` and its 429 `QuotaFailure`). Logs: `spikes/out/S9-*.json`. Earlier
+runs broken by spike bugs were discarded (`spikes/out/s9_discarded/`, see "spike bugs" below).
+
+### Limits found
+| Model | Provider limit | Source |
+|---|---|---|
+| `openai/gpt-oss-120b`, `openai/gpt-oss-20b`, `qwen/qwen3.8-27b` | 1,000 requests/day, **8,000 tokens/minute** each | Groq headers |
+| `gemini-3.8-flash` | **20 requests/day** (free tier, per project per model) | Google 429 QuotaFailure |
+| `gemini-3.5-flash-lite` | not hit (57 calls today) | unknown |
+
+Groq's daily token cap is not exposed; 117,087 tokens were used on gpt-oss-120b today without
+hitting it. Groq appears to count `max_completion_tokens` against the per-minute window (429s
+arrived while our own accounting of actual tokens was under the limit).
+
+### (a) Structured output on the plan DSL, 20 trials each, planner temperature 0.7
+| Model | Mode that works | Prompt | JSON | Schema-valid | Runnable plan |
+|---|---|---|---|---|---|
+| gpt-oss-120b | `schema` (strict refuses `propertyNames`) | v1 | 20 | 11 | **4** |
+| gpt-oss-120b | `schema` | **v2** | 20 | 20 | **20** |
+| qwen3.8-27b | `schema` | v1 | 18 (+2 unavailable) | 10 | 5 |
+| gemini-3.5-flash-lite | `json` (Gemini refuses recursive required refs) | v1 | 20 | 19 | 19 |
+| gemini-3.5-flash-lite | `json` | **v2** | 20 | 20 | **20** |
+| gemini-3.8-flash | not measured: daily quota used up during the first, broken run | | | | |
+
+v1 failures were prompt gaps, not model limits: list constants (`{"const": []}`), reading an
+inner loop's collect outside the outer loop, and `if` used as an expression. `planner_v2` adds
+one complete example (checked by `validate_plan`) and explicit scoping rules. Decision: the
+planner uses `planner_v2`; plans are still validated deterministically before running.
+
+### (b) Determinism at temperature 0 (review extraction, 5 identical calls)
+| Model | Seed accepted | Distinct outputs with seed | Without seed | Injection flagged |
+|---|---|---|---|---|
+| qwen3.8-27b (extractor) | yes | **1** | 1 | 5/5 |
+| gemini-3.5-flash-lite | yes | **1** | 5 | 5/5 |
+| gpt-oss-120b | yes | **3** | 3 | 5/5 |
+
+gpt-oss-120b reported a different `system_fingerprint` on every call (load-balanced across
+backends), so even seeded calls vary. Gemini is deterministic only with a seed. Consequence: the
+replay cache, not the model, is what makes reused steps identical; every LLM call records its
+response, and cached roles reuse it.
+
+### (c) Tokens per call (means)
+| Call | Model | Input | Output | Reasoning | Total | Wall per call |
+|---|---|---|---|---|---|---|
+| Planner (v2) | gpt-oss-120b | 1,950 | 1,000 | 18 | 2,966 | about 70 s average under the TPM limit |
+| Planner (v2) | gemini-3.5-flash-lite | | | 0 | 3,396 | about 4 s |
+| Review extraction | qwen3.8-27b | | | 444 | 837 | |
+| Vision check | gemini-3.5-flash-lite | | | | 1,120 | |
+
+### (d) Vision (synthetic rendered sneaker photos, not real product photos)
+gemini-3.5-flash-lite: 6/6 correct (navy described as "blue", correctly not matching black).
+gemini-3.8-flash: not measured (quota).
+
+### Budget for one full recourse case
+3 players, 8 coalitions, k samples each: coalitions without A replay the planner, those with A
+the reference policy; extraction and ranking are cached except for the corrected-content variant.
+
+| k | gpt-oss-120b (planner + 2 mandate calls) | reference policy | qwen | vision |
+|---|---|---|---|---|
+| 8 | 34 requests, about 98k tokens | 33 requests, about 110k tokens (if on Flash-Lite) | 4, about 3k | 1 |
+| 4 | 18 requests, about 50k tokens | 17 requests, about 56k tokens | 4, about 3k | 1 |
+
+At Groq's 8,000 tokens/minute, the 32 planner replays of a k=8 case take at least 14 minutes
+(at a 1,500-token output cap), so one case costs a demo about a quarter hour of wall time and
+roughly half of what gpt-oss-120b handled today.
+
+### Consequences (decisions needed, see report)
+- `gemini-3.8-flash` (20 requests/day) cannot host the reference policy (32 calls per case at
+  k=8) or the baseline agent (hundreds of calls in eval). It is fine for vision (1 call per case).
+- Run k=4 for development and evaluation, k=8 for the recorded demo case.
+- Re-run S9 on gemini-3.8-flash after its quota resets.
+
+### Spike bugs found and fixed during S9
+- Trials fired into a 429 cooldown without waiting, wasting 18 of 20 trials (now waits).
+- Four processes created the shared SQLite budget tables at once ("table already exists"); tables
+  are created before parallel runs (Alembic removes this in the app).
+- Config was re-read inside the trial loop (`KeyError`); values are passed in.
