@@ -23,7 +23,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from api.views import provenance_graph, short, step
+from api.views import provenance_graph, session_from_events, short, step
 from lineage.fulfillment import FulfillmentError, authorize_recorded
 from lineage.interpreter import Proposal
 from lineage.mandate import VerifiedMandate
@@ -197,9 +197,13 @@ def create_app(rt: Runtime | None = None) -> FastAPI:
         e = sessions.get(sid)
         out: dict[str, Any] = {"id": sid, "chain_head": chain_head(sid)}
         if e is None:
-            out["state"] = "archived" if out["chain_head"] else "unknown"
-            return out
-        out.update({"state": e.state, "error": e.error, "user": e.user, "fields": e.fields})
+            evs = rt.recorder.events(sid)
+            return session_from_events(
+                sid, [(x.event_type, x.payload) for x in evs], out["chain_head"]
+            )
+        out.update(
+            {"state": e.state, "error": e.error, "user": e.user, "fields": e.fields, "live": True}
+        )
         if e.vm is not None:
             out["mandate_seal"] = short(e.vm.envelope.payload_hash, 12)
         if e.proposal is not None:

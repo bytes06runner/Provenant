@@ -44,13 +44,24 @@ def parse_source(s: str) -> dict[str, str]:
     return {"label": label, "ref": ref, "path": path, "kind": kind, "text": _source_text(ref, path)}
 
 
+_MANIFEST_WORDS = {
+    "paypal_merchant_id": "payee id",
+    "sku": "item",
+    "price": "price",
+    "shipping_flat": "shipping",
+    "tax_rate": "tax rate",
+    "currency": "currency",
+}
+
+
 def _source_text(ref: str, path: str) -> str:
     parts = ref.split(":")
     kind = parts[0]
     if kind == "manifest" and len(parts) >= 3:
         what = path.split(".")[-1] if path else "manifest"
+        what = _MANIFEST_WORDS.get(what, what.replace("_", " "))
         item = path.split("[")[1].split("]")[0] if "[" in path else ""
-        return f"{parts[1]} signed manifest{' ' + item if item else ''}: {what}"
+        return f"{parts[1]} signed: {item + ' ' if item else ''}{what}"
     if kind == "mandate":
         return f"your signed mandate: {path or 'mandate'}"
     if kind == "vault":
@@ -242,3 +253,54 @@ def provenance_graph(events: list[tuple[str, dict[str, Any]]]) -> dict[str, Any]
         "blocked": attempts,
         "decision": decision,
     }
+
+
+def session_from_events(
+    sid: str, events: list[tuple[str, dict[str, Any]]], head: str | None
+) -> dict[str, Any]:
+    """A session's summary rebuilt from its recorded events (after an API restart)."""
+    out: dict[str, Any] = {
+        "id": sid,
+        "chain_head": head,
+        "state": "archived" if events else "unknown",
+        "live": False,  # read-only: actions need the live session
+    }
+
+    def last(t: str) -> dict[str, Any] | None:
+        return next((p for et, p in reversed(events) if et == t), None)
+
+    signed = last("mandate.signed")
+    if signed:
+        out["mandate_seal"] = short(signed["envelope"]["payload_hash"], 12)
+    proposed = last("plan.proposed")
+    if proposed:
+        out["chosen"] = proposed.get("candidate")
+        out["decision_label"] = proposed.get("decision_label")
+        out["state"] = "proposed"
+    verified = [p for et, p in events if et == "tool.manifest_verified"]
+    if proposed and verified:
+        mid = proposed["candidate"]["merchant_id"]
+        seal = next((v["manifest_hash"] for v in verified if v.get("merchant_id") == mid), None)
+        out["manifest_seal"] = short(seal, 12)
+    created = last("paypal.order.created")
+    if created:
+        order = created["order"]
+        link = next(
+            (
+                x["href"]
+                for x in order.get("links", [])
+                if x.get("rel") in ("payer-action", "approve")
+            ),
+            None,
+        )
+        out["order"] = {
+            "id": order["id"],
+            "merchant_id": created["merchant_id"],
+            "status": order.get("status"),
+            "custom_id": order["purchase_units"][0].get("custom_id"),
+            "approval_url": link,
+        }
+        out["state"] = "ordered"
+    if last("paypal.authorization"):
+        out["state"] = "authorized"
+    return out

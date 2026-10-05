@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from api.views import parse_source, provenance_graph, short, step
+from api.views import parse_source, provenance_graph, session_from_events, short, step
 
 SIGNED_PRICE = "MERCHANT_SIGNED:manifest:kestrel:9c15a8#catalog[KES-001].price"
 PAGE = "UNTRUSTED:page:http://shop/m/attacker/reviews/ATT-001"
@@ -14,10 +14,14 @@ def test_sources_are_parsed_into_plain_words():
         "ref": "manifest:kestrel:9c15a8",
         "path": "catalog[KES-001].price",
         "kind": "manifest",
-        "text": "kestrel signed manifest KES-001: price",
+        "text": "kestrel signed: KES-001 price",
     }
     assert parse_source("USER:mandate:m-1#quantity")["text"] == "your signed mandate: quantity"
     assert parse_source("USER:vault:buyer_a:home")["text"] == "your address book: home"
+    sealed = "MERCHANT_SIGNED:manifest:k:9c"
+    assert parse_source(f"{sealed}#paypal_merchant_id")["text"] == "k signed: payee id"
+    assert parse_source(f"{sealed}#shipping_flat")["text"] == "k signed: shipping"
+    assert parse_source(sealed)["text"] == "k signed: manifest"
     assert parse_source(PAGE)["text"] == "web page http://shop/m/attacker/reviews/ATT-001"
     assert parse_source("UNTRUSTED:qllm:rank")["text"] == "quarantined extractor: rank"
     assert parse_source("DERIVED:registry:merchants")["text"] == "registry:merchants"
@@ -174,3 +178,37 @@ def test_provenance_graph_of_an_unfinished_session():
         "blocked": [],
         "decision": None,
     }
+
+
+def test_session_summary_rebuilt_from_recorded_events():
+    events = [
+        ("mandate.signed", {"envelope": {"payload_hash": "8d473b12a424ffff"}}),
+        ("tool.manifest_verified", {"merchant_id": "northwind", "manifest_hash": "13042e8b50ca99"}),
+        (
+            "plan.proposed",
+            {
+                "candidate": {"merchant_id": "northwind", "sku": "NOR-001"},
+                "decision_label": "UNTRUSTED",
+            },
+        ),
+    ]
+    s = session_from_events("s-1", events, "641eb66c")
+    assert s["state"] == "proposed" and s["mandate_seal"] == "8d473b12a424" and s["live"] is False
+    assert s["manifest_seal"] == "13042e8b50ca" and s["decision_label"] == "UNTRUSTED"
+    order = {
+        "id": "O1",
+        "status": "PAYER_ACTION_REQUIRED",
+        "purchase_units": [{"custom_id": "pv:x"}],
+        "links": [{"rel": "payer-action", "href": "https://pp/approve"}],
+    }
+    s = session_from_events(
+        "s-1",
+        [*events, ("paypal.order.created", {"merchant_id": "northwind", "order": order})],
+        "h",
+    )
+    assert s["state"] == "ordered" and s["order"]["approval_url"] == "https://pp/approve"
+    s = session_from_events(
+        "s-1", [*events, ("paypal.authorization", {"authorization_id": "A1"})], "h"
+    )
+    assert s["state"] == "authorized"
+    assert session_from_events("s-2", [], None)["state"] == "unknown"
