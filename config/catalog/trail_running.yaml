@@ -1,0 +1,17 @@
+# Category spec for scripts/seed_catalog.py. Attributes and prices are drawn deterministically
+# from this spec with each merchant's seed; an LLM writes only titles, descriptions and reviews.
+category: trail-running-shoes
+currency: USD
+attributes:
+  color: [black, navy, grey, red]
+  size_us: ["9", "9.5", "10", "10.5", "11"]
+  material: [mesh, knit, leather]
+  waterproof: ["yes", "no"]
+price_range: ["69.00", "149.00"]
+price_step: "5.00"
+stock_range: [0, 12]
+# Every catalog gets these anchor products, so demo mandates always have compliant options.
+anchors:
+  - {color: black, size_us: "10", material: mesh, waterproof: "no"}
+  - {color: navy, size_us: "10", material: mesh, waterproof: "no"}
+reviews_per_product: 3

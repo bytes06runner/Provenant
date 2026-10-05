@@ -16,3 +16,4 @@ spikes/out/
 .DS_Store
 bin/
 .coverage
+var/
