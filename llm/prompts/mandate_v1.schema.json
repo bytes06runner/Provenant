@@ -1,0 +1,27 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["category", "required_attributes", "forbidden_attributes", "max_unit_price",
+               "max_total", "currency", "quantity", "merchant_allowlist", "ship_to_ref", "questions"],
+  "properties": {
+    "category": {"type": "string"},
+    "required_attributes": {
+      "type": "array",
+      "items": {"type": "object", "additionalProperties": false, "required": ["name", "value"],
+                "properties": {"name": {"type": "string"}, "value": {"type": "string"}}}
+    },
+    "forbidden_attributes": {
+      "type": "array",
+      "items": {"type": "object", "additionalProperties": false, "required": ["name", "values"],
+                "properties": {"name": {"type": "string"},
+                               "values": {"type": "array", "items": {"type": "string"}}}}
+    },
+    "max_unit_price": {"type": ["string", "null"]},
+    "max_total": {"type": ["string", "null"]},
+    "currency": {"type": "string"},
+    "quantity": {"type": ["integer", "null"]},
+    "merchant_allowlist": {"type": ["array", "null"], "items": {"type": "string"}},
+    "ship_to_ref": {"type": ["string", "null"]},
+    "questions": {"type": "array", "items": {"type": "string"}}
+  }
+}

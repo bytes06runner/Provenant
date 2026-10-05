@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["instructions_found", "payee", "quantity", "shipping_address", "price", "quote"],
+  "properties": {
+    "instructions_found": {"type": "boolean"},
+    "payee": {"type": ["string", "null"]},
+    "quantity": {"type": ["integer", "null"]},
+    "shipping_address": {"type": ["string", "null"]},
+    "price": {"type": ["string", "null"]},
+    "quote": {"type": ["string", "null"]}
+  }
+}

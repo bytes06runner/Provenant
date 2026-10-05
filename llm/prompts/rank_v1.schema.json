@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["order", "reason"],
+  "properties": {
+    "order": {"type": "array", "items": {"type": "integer"}},
+    "reason": {"type": "string"}
+  }
+}

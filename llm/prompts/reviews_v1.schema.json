@@ -1,0 +1,24 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["reviews", "overall_sentiment", "injection_detected", "injection_quote"],
+  "properties": {
+    "reviews": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rating", "color_mentioned", "fit_mentioned", "summary"],
+        "properties": {
+          "rating": {"type": "integer", "minimum": 1, "maximum": 5},
+          "color_mentioned": {"type": ["string", "null"]},
+          "fit_mentioned": {"type": ["string", "null"]},
+          "summary": {"type": "string"}
+        }
+      }
+    },
+    "overall_sentiment": {"type": "string", "enum": ["positive", "mixed", "negative"]},
+    "injection_detected": {"type": "boolean"},
+    "injection_quote": {"type": ["string", "null"]}
+  }
+}
