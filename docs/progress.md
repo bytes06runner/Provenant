@@ -583,3 +583,12 @@ Bug found during the run: violations with label UNTRUSTED were recorded with `"l
 because `Label.UNTRUSTED` is the enum's zero value and a truthiness check dropped it. Enforcement
 was unaffected (the block itself was correct). Fixed, with a regression test; this run's two
 recorded events predate the fix.
+
+## 2026-10-05: Phase 1 close-out decisions
+
+- Sandbox integration test of the end-to-end flow: written now (`tests/integration/`).
+- **Deferred until just before deploy (Phase 4):** Alembic migrations and the Postgres-backed
+  vault, key and nonce stores. Until then tables are created at startup on SQLite under `var/`.
+  This also removes the create-table race seen in S9.
+- Flash-Lite daily request limit: waiting for the number from AI Studio.
+- Design direction for Phase 3 saved in `docs/design.md`.
