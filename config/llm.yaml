@@ -11,7 +11,7 @@ providers:
     base_url: https://generativelanguage.googleapis.com/v1beta
     api_key_env: GEMINI_API_KEY
 
-roles: [planner, mandate, extractor, vision, narrator, reference_policy, baseline, seed_generator]
+roles: [planner, mandate, extractor, vision, vision_escalation, narrator, reference_policy, baseline, seed_generator]
 
 http:
   timeout_seconds: 120
@@ -35,14 +35,30 @@ budgets:
     # per project per model (GenerateRequestsPerDayPerProjectPerModel-FreeTier). Token numbers
     # are still our own caps. Use for low-volume roles only.
     "gemini-3.8-flash": {tokens_per_minute: 250000, requests_per_day: 20, tokens_per_day: 500000}
-    "gemini-3.5-flash-lite": {tokens_per_minute: 250000, requests_per_day: 1000, tokens_per_day: 500000}
+    # PROVISIONAL: Google publishes free-tier limits only in AI Studio. The router records the
+    # exact value from the first quota 429 (QuotaFailure.quotaValue) and adjusts in memory.
+    "gemini-3.5-flash-lite": {tokens_per_minute: 250000, requests_per_day: 1000, tokens_per_day: 2000000}
 
 # Replay cache (Blackbox): which roles may reuse a recorded response when inputs are identical.
 #   always: reuse whenever the exact inputs were seen (deterministic roles, temperature 0)
 #   never:  always call the model (the sampled planner during counterfactual replay)
+# Warn when a model reaches this share of its daily requests or tokens.
+budget_warning_fraction: "0.8"
+
+# Per-role call defaults. max_tokens sized from S9 (largest v2 plan: 704 output tokens).
+calls:
+  planner: {max_tokens: 1200, temperature: "0.7", structured: json}
+  reference_policy: {max_tokens: 1200, temperature: "0.7", structured: schema}
+  mandate: {max_tokens: 1200, temperature: "0", structured: schema}
+  extractor: {max_tokens: 1024, temperature: "0", structured: strict}
+  vision: {max_tokens: 512, temperature: "0", structured: schema}
+  vision_escalation: {max_tokens: 1024, temperature: "0", structured: schema}
+  narrator: {max_tokens: 800, temperature: "0.3", structured: schema}
+
 cache:
   extractor: always
   vision: always
+  vision_escalation: always
   mandate: always
   narrator: never
   planner: never

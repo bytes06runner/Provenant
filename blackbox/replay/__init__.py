@@ -1,7 +1,8 @@
 """Counterfactual replay settings (the engine itself lands in Phase 2).
 
 k, the number of samples per coalition, is configurable per run: config/app.yaml sets the
-default (attribution.samples_per_coalition) and any run may override it.
+default (attribution.samples_per_coalition = 4, for development and evaluation), any run
+may override it, and the recorded demo case uses demo_samples_per_coalition (8).
 """
 
 from __future__ import annotations
@@ -23,3 +24,8 @@ class ReplaySettings:
     def for_run(cls, k: int | None = None) -> ReplaySettings:
         default = int(load_yaml("app.yaml")["attribution"]["samples_per_coalition"])
         return cls(k if k is not None else default)
+
+    @classmethod
+    def for_demo(cls) -> ReplaySettings:
+        """k for the single recorded demo case (config: demo_samples_per_coalition)."""
+        return cls(int(load_yaml("app.yaml")["attribution"]["demo_samples_per_coalition"]))

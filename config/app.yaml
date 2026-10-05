@@ -23,7 +23,8 @@ remedy:
   auto_remedy_env: AUTO_REMEDY
 
 attribution:
-  samples_per_coalition: 8
+  samples_per_coalition: 4        # development and evaluation
+  demo_samples_per_coalition: 8   # the single recorded demo case
   bootstrap_resamples: 2000
   ci_level: 0.95
   max_ci_width_for_auto: 0.35
