@@ -1,0 +1,48 @@
+# LLM layer configuration. Keys and model ids come from .env; this file holds endpoints,
+# per-model budgets and call policy. Budget numbers come from spike S9 and provider headers.
+
+providers:
+  groq:
+    kind: openai_compatible
+    base_url: https://api.groq.com/openai/v1
+    api_key_env: GROQ_API_KEY
+  gemini:
+    kind: gemini
+    base_url: https://generativelanguage.googleapis.com/v1beta
+    api_key_env: GEMINI_API_KEY
+
+roles: [planner, mandate, extractor, vision, narrator, reference_policy, baseline]
+
+http:
+  timeout_seconds: 120
+  max_retries: 2            # on 5xx and transport errors, before falling back
+  backoff_base_seconds: 1.0
+  default_cooldown_seconds: 60   # after a 429 without a retry hint
+
+# Per-model limits. tokens_per_minute and requests_per_day are read from Groq's
+# x-ratelimit-* headers (2026-10-05). tokens_per_day is our own cap, set below the provider's
+# so a demo day can never be stopped by a hard provider limit.
+budgets:
+  default:
+    tokens_per_minute: 8000
+    requests_per_day: 1000
+    tokens_per_day: 150000
+  models:
+    "openai/gpt-oss-120b": {tokens_per_minute: 8000, requests_per_day: 1000, tokens_per_day: 150000}
+    "openai/gpt-oss-20b": {tokens_per_minute: 8000, requests_per_day: 1000, tokens_per_day: 150000}
+    "qwen/qwen3.8-27b": {tokens_per_minute: 8000, requests_per_day: 1000, tokens_per_day: 150000}
+    # Gemini does not report limits in headers. PROVISIONAL until measured in spike S9.
+    "gemini-3.8-flash": {tokens_per_minute: 250000, requests_per_day: 250, tokens_per_day: 500000}
+    "gemini-3.5-flash-lite": {tokens_per_minute: 250000, requests_per_day: 1000, tokens_per_day: 500000}
+
+# Replay cache (Blackbox): which roles may reuse a recorded response when inputs are identical.
+#   always: reuse whenever the exact inputs were seen (deterministic roles, temperature 0)
+#   never:  always call the model (the sampled planner during counterfactual replay)
+cache:
+  extractor: always
+  vision: always
+  mandate: always
+  narrator: never
+  planner: never
+  reference_policy: never
+  baseline: never
