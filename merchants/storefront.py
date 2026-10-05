@@ -34,6 +34,16 @@ class Shipment:
     shipped_attributes: dict[str, str]
 
     @property
+    def tracking_number(self) -> str:
+        """Deterministic simulated carrier tracking number for this shipment."""
+        return (
+            "SIM"
+            + hashlib.sha256(f"{self.order_ref}|{self.shipped_sku}".encode())
+            .hexdigest()[:12]
+            .upper()
+        )
+
+    @property
     def correct(self) -> bool:
         return self.shipped_sku == self.ordered_sku
 

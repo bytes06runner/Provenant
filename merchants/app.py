@@ -112,6 +112,7 @@ def create_app(stores: dict[str, Storefront], *, allow_planted: bool = False) ->
             "ordered_sku": s.ordered_sku,
             "shipped_sku": s.shipped_sku,
             "shipped_attributes": s.shipped_attributes,
+            "tracking_number": s.tracking_number,
         }
 
     return app

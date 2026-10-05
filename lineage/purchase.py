@@ -85,6 +85,15 @@ class PurchaseSession:
 
     def propose(self, request_text: str, address_refs: list[str]) -> roles.MandateProposal:
         self.record("request", {"user_id": self.user_id, "text": request_text})
+        # Which agent policy ran, so Blackbox replays the same agent for coalitions without A.
+        self.record(
+            "agent.policy",
+            {
+                "planner_role": "planner",
+                "planner_prompt": str(self.settings["planner_prompt"]),
+                "rank_prompt": str(getattr(self.toolbox, "rank_prompt", "rank_v1")),
+            },
+        )
         proposal = roles.propose_mandate(
             self.router,
             request_text,
