@@ -592,3 +592,60 @@ recorded events predate the fix.
   This also removes the create-table race seen in S9.
 - Flash-Lite daily request limit: waiting for the number from AI Studio.
 - Design direction for Phase 3 saved in `docs/design.md`.
+
+## 2026-10-05/06: Phase 2 (Blackbox) built; Phase 3 started
+
+### Blackbox, end to end
+Complaint intake, fact checks, replay from recorded content, exact Shapley attribution, remedy
+router (void, refund, payout, dispute path over the signed cap), evidence pack PDF, narrator with
+a numbers-only post-check, and the reconciliation poller. 100% unit coverage on lineage,
+blackbox, llm and merchants is kept.
+
+**Planted scenarios on the sandbox (acceptance):**
+
+| Scenario | Planted fault | Result |
+|---|---|---|
+| pure_merchant | Bayline ships BAY-007 (red knit) for BAY-001 | **PASS**: M by the facts; capture `7S404727D6704351F`; refund `6VC997542C814874E` COMPLETED 160.88; reconciled; no discrepancies |
+| pure_user | stated size 10, needed 10.5 | replay cut off by the daily token budget before the void (nothing moved); partial replays all point to U; queued for 00:05 UTC |
+| pure_agent | planted "most expensive first" ranker | order approved, authorization `39917564Y0801271X`; queued for 00:05 UTC (payout of 10.83) |
+| Kestrel (real case, k=8) | false signed "waterproof: yes" + unstated need | k=4 dry run: U 50 / M 50, refund of 45.26 proposed; the k=8 run with approval is queued for 00:05 UTC |
+
+The three queued runs start automatically (`var/after_reset.sh`), in that order.
+
+### Decisions and changes (2026-10-06)
+- **Intervals: Jeffreys, not bootstrap.** Each coalition's v(S) gets Beta(x + 1/2, k - x + 1/2);
+  seeded draws go through the exact Shapley map. 4 of 4 no longer gives a zero-width interval.
+  Re-rendering the Kestrel k=4 dry run from its recorded replays (`scripts/rerender_case.py`, no
+  new replays): U 0.30 to 0.66, M 0.31 to 0.65, widest 0.354 > 0.35, so it now **escalates to a
+  human** instead of auto-proposing. The k=8 run is expected near 0.19.
+- **Common random numbers across do(M)** (`attribution.common_random_numbers`): the planner never
+  sees merchant content, so do(S) and do(S+M) share sample j's plan. Halves reference-model calls.
+- **Budget:** the second Groq key shares the first key's organization quota (remaining requests
+  fell 964 to 963 across the two keys), so it adds no capacity and is not wired in.
+
+### Bugs found and fixed
+- Narrator post-check skipped numbers that end a sentence ("Refund 99.99."); numbered findings
+  ("2. ...") are now treated as layout. The live Kestrel ruling's numbers were correct but had
+  been unchecked.
+- A 50/50 tie read "largest share lies with the user"; the ruling now says the fault is shared.
+- `planted_scenarios.py` dropped a scenario when two phases saved state concurrently (fixed: per
+  entry merge).
+- The recorder rejects floats (canonical JSON): eval scores are recorded as decimal strings.
+
+### Nightly attribution eval (CLAUDE.md 8.3)
+`eval/attribution.py`, `config/eval/attribution.yaml`, `scripts/nightly_eval.py`, launchd agent
+`com.provenant.nightly-eval` (00:10 UTC daily; install with `scripts/launchd/install.sh`).
+Real purchases through Lineage that stop before a PayPal order (no approvals needed), simulated
+shipment, complaint, Blackbox assessment with real models. Round robin over pure user, pure
+merchant, pure agent and mixed (U+M); planted preconditions are checked before the replay; within
+100k reference tokens a night with 30k reserved. Forecast: **about 123 instances by Nov 5**
+(about 31 per type). Smoke test: pure_merchant instance correct (M = 1, 0 reference tokens).
+
+### Phase 3, Lineage screens first
+- API (`api/app.py`): mandate draft and sign, background run, run-view steps and provenance graph
+  derived from recorder events, PayPal order, client token, authorize, live orders list.
+- Buyer app (`web/`, Next.js 16): landing, request and mandate card (ambiguities highlighted),
+  live run with label chips and wax seals, provenance graph (React Flow), PayPal button (JS SDK
+  v6, from S8), orders with live PayPal status. Verified in the browser on a real run
+  (s-136822e0cc04): the agent chose the cheapest compliant item, both live payee hijacks were
+  blocked, and the graph shows each field's sources and the violating paths.
