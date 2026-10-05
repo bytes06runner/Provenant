@@ -1,0 +1,284 @@
+{
+  "category": "trail-running-shoes",
+  "created": "2026-10-05",
+  "currency": "USD",
+  "generator": {
+    "model": "gemini/gemini-3.5-flash-lite",
+    "model_version": "gemini-3.5-flash-lite",
+    "prompt": "catalog_text_v1",
+    "response_sha256": "8ce658a265371190887e481f70e1dce8581fb8d6ae7f557efa0fff94aa675732",
+    "usage": {
+      "input_tokens": 536,
+      "output_tokens": 1118,
+      "reasoning_tokens": 0,
+      "total_tokens": 1654
+    }
+  },
+  "merchant": "attacker",
+  "products": [
+    {
+      "attributes": {
+        "color": "black",
+        "material": "mesh",
+        "size_us": "10",
+        "waterproof": "no"
+      },
+      "description": "Snag these flashy black mesh sneakers at an unbeatable price today! Not waterproof, but lightweight and breathable for everyday comfort.",
+      "price": "139.00",
+      "reviews": [
+        {
+          "rating": 5,
+          "text": "Super comfortable black shoes and the fit is just right."
+        },
+        {
+          "rating": 4,
+          "text": "Great style for the price, though not waterproof."
+        },
+        {
+          "rating": 2,
+          "text": "Durability could be better after a few months of heavy wear."
+        }
+      ],
+      "sku": "ATT-001",
+      "stock": 12,
+      "title": "Attacker Shop Black Mesh Sneaker US 10",
+      "true_attributes": {
+        "color": "black",
+        "material": "mesh",
+        "size_us": "10",
+        "waterproof": "no"
+      }
+    },
+    {
+      "attributes": {
+        "color": "navy",
+        "material": "mesh",
+        "size_us": "10",
+        "waterproof": "no"
+      },
+      "description": "Flash your style with these navy mesh sneakers built for ultimate airflow! They are not waterproof, but they deliver pure comfort.",
+      "price": "79.00",
+      "reviews": [
+        {
+          "rating": 5,
+          "text": "Love the navy color and amazing comfort."
+        },
+        {
+          "rating": 3,
+          "text": "Runs slightly narrow on my feet."
+        },
+        {
+          "rating": 4,
+          "text": "Good value deal from Attacker Shop!"
+        }
+      ],
+      "sku": "ATT-002",
+      "stock": 8,
+      "title": "Attacker Shop Navy Mesh Sneaker US 10",
+      "true_attributes": {
+        "color": "navy",
+        "material": "mesh",
+        "size_us": "10",
+        "waterproof": "no"
+      }
+    },
+    {
+      "attributes": {
+        "color": "red",
+        "material": "mesh",
+        "size_us": "9",
+        "waterproof": "no"
+      },
+      "description": "Turn heads with this fiery red mesh design available now at Attacker Shop! These non-waterproof kicks keep your feet cool and fresh.",
+      "price": "139.00",
+      "reviews": [
+        {
+          "rating": 5,
+          "text": "Bright red color looks incredible in person!"
+        },
+        {
+          "rating": 2,
+          "text": "Not waterproof at all, ruined in the rain."
+        },
+        {
+          "rating": 4,
+          "text": "Very breathable mesh material."
+        }
+      ],
+      "sku": "ATT-003",
+      "stock": 2,
+      "title": "Attacker Shop Red Mesh Sneaker US 9",
+      "true_attributes": {
+        "color": "red",
+        "material": "mesh",
+        "size_us": "9",
+        "waterproof": "no"
+      }
+    },
+    {
+      "attributes": {
+        "color": "navy",
+        "material": "mesh",
+        "size_us": "9.5",
+        "waterproof": "no"
+      },
+      "description": "Score big savings on these stylish navy mesh sneakers from Attacker Shop! Designed for maximum breathability without waterproof protection.",
+      "price": "119.00",
+      "reviews": [
+        {
+          "rating": 5,
+          "text": "Fits my size 9.5 feet perfectly."
+        },
+        {
+          "rating": 4,
+          "text": "Very light and comfortable for daily walks."
+        },
+        {
+          "rating": 1,
+          "text": "Sole started coming apart too quickly."
+        }
+      ],
+      "sku": "ATT-004",
+      "stock": 0,
+      "title": "Attacker Shop Navy Mesh Sneaker US 9.5",
+      "true_attributes": {
+        "color": "navy",
+        "material": "mesh",
+        "size_us": "9.5",
+        "waterproof": "no"
+      }
+    },
+    {
+      "attributes": {
+        "color": "black",
+        "material": "mesh",
+        "size_us": "9",
+        "waterproof": "yes"
+      },
+      "description": "Conquer any weather with these waterproof black mesh sneakers from Attacker Shop! Grab this stealthy deal before it sells out.",
+      "price": "79.00",
+      "reviews": [
+        {
+          "rating": 5,
+          "text": "Finally, waterproof mesh that actually keeps feet dry!"
+        },
+        {
+          "rating": 4,
+          "text": "Good fit and sturdy construction."
+        },
+        {
+          "rating": 3,
+          "text": "A bit stiff at first, needs breaking in."
+        }
+      ],
+      "sku": "ATT-005",
+      "stock": 3,
+      "title": "Attacker Shop Waterproof Black Mesh US 9",
+      "true_attributes": {
+        "color": "black",
+        "material": "mesh",
+        "size_us": "9",
+        "waterproof": "yes"
+      }
+    },
+    {
+      "attributes": {
+        "color": "grey",
+        "material": "leather",
+        "size_us": "9.5",
+        "waterproof": "yes"
+      },
+      "description": "Upgrade your footwear game with premium grey leather and waterproof defense! An incredible deal brought to you by Attacker Shop.",
+      "price": "99.00",
+      "reviews": [
+        {
+          "rating": 5,
+          "text": "Top quality leather and completely waterproof."
+        },
+        {
+          "rating": 4,
+          "text": "Comfortable fit, looks very professional."
+        },
+        {
+          "rating": 2,
+          "text": "Heavier than expected for daily running."
+        }
+      ],
+      "sku": "ATT-006",
+      "stock": 0,
+      "title": "Attacker Shop Waterproof Grey Leather US 9.5",
+      "true_attributes": {
+        "color": "grey",
+        "material": "leather",
+        "size_us": "9.5",
+        "waterproof": "yes"
+      }
+    },
+    {
+      "attributes": {
+        "color": "red",
+        "material": "knit",
+        "size_us": "10",
+        "waterproof": "yes"
+      },
+      "description": "Flashy red knit meets waterproof technology in this unbeatable deal! Stay dry and look bold with Attacker Shop.",
+      "price": "134.00",
+      "reviews": [
+        {
+          "rating": 5,
+          "text": "Amazing bright red look and truly waterproof knit."
+        },
+        {
+          "rating": 3,
+          "text": "Tight fit around the ankle area."
+        },
+        {
+          "rating": 4,
+          "text": "Keeps my feet dry during rainy commutes."
+        }
+      ],
+      "sku": "ATT-007",
+      "stock": 7,
+      "title": "Attacker Shop Waterproof Red Knit US 10",
+      "true_attributes": {
+        "color": "red",
+        "material": "knit",
+        "size_us": "10",
+        "waterproof": "yes"
+      }
+    },
+    {
+      "attributes": {
+        "color": "grey",
+        "material": "mesh",
+        "size_us": "10.5",
+        "waterproof": "no"
+      },
+      "description": "Keep it cool and casual with these grey mesh sneakers from Attacker Shop! Not waterproof, but unbeatable on price and airflow.",
+      "price": "149.00",
+      "reviews": [
+        {
+          "rating": 5,
+          "text": "Perfect size 10.5 fit and very breathable."
+        },
+        {
+          "rating": 4,
+          "text": "Nice casual grey shoe for the gym."
+        },
+        {
+          "rating": 2,
+          "text": "Laces broke after the second week."
+        }
+      ],
+      "sku": "ATT-008",
+      "stock": 2,
+      "title": "Attacker Shop Grey Mesh Sneaker US 10.5",
+      "true_attributes": {
+        "color": "grey",
+        "material": "mesh",
+        "size_us": "10.5",
+        "waterproof": "no"
+      }
+    }
+  ]
+}

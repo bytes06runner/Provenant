@@ -1,0 +1,284 @@
+{
+  "category": "trail-running-shoes",
+  "created": "2026-10-05",
+  "currency": "USD",
+  "generator": {
+    "model": "gemini/gemini-3.5-flash-lite",
+    "model_version": "gemini-3.5-flash-lite",
+    "prompt": "catalog_text_v1",
+    "response_sha256": "4970ad4a7ca80c17ab796a3518dd7d944adf3af20130c7fd49a26d39db2f06e3",
+    "usage": {
+      "input_tokens": 540,
+      "output_tokens": 1044,
+      "reasoning_tokens": 0,
+      "total_tokens": 1584
+    }
+  },
+  "merchant": "northwind",
+  "products": [
+    {
+      "attributes": {
+        "color": "black",
+        "material": "mesh",
+        "size_us": "10",
+        "waterproof": "no"
+      },
+      "description": "Designed for breathability, this black mesh shoe offers lightweight comfort for fair-weather trails. Note that it is not waterproof, so keep it away from heavy dampness.",
+      "price": "69.00",
+      "reviews": [
+        {
+          "rating": 5,
+          "text": "Very comfortable and light for daily walks. The black color goes with everything."
+        },
+        {
+          "rating": 3,
+          "text": "Good airflow, but the fit felt a bit narrow in the toes."
+        },
+        {
+          "rating": 4,
+          "text": "Decent durability for dry weather use. Just wish they kept the rain out."
+        }
+      ],
+      "sku": "NOR-001",
+      "stock": 10,
+      "title": "Northwind Black Mesh Shoe",
+      "true_attributes": {
+        "color": "black",
+        "material": "mesh",
+        "size_us": "10",
+        "waterproof": "no"
+      }
+    },
+    {
+      "attributes": {
+        "color": "navy",
+        "material": "mesh",
+        "size_us": "10",
+        "waterproof": "no"
+      },
+      "description": "This navy mesh shoe provides optimal ventilation during warm outdoor excursions. It is not waterproof, ensuring maximum breathability when skies are clear.",
+      "price": "134.00",
+      "reviews": [
+        {
+          "rating": 4,
+          "text": "The navy shade looks sharp and the mesh is very airy. Great fit overall."
+        },
+        {
+          "rating": 2,
+          "text": "Not waterproof at all, got soaked on a dewy morning walk. Comfort is fine though."
+        },
+        {
+          "rating": 5,
+          "text": "Solid construction and very breathable. Perfect for summer trails."
+        }
+      ],
+      "sku": "NOR-002",
+      "stock": 12,
+      "title": "Northwind Navy Mesh Shoe",
+      "true_attributes": {
+        "color": "navy",
+        "material": "mesh",
+        "size_us": "10",
+        "waterproof": "no"
+      }
+    },
+    {
+      "attributes": {
+        "color": "grey",
+        "material": "knit",
+        "size_us": "10.5",
+        "waterproof": "yes"
+      },
+      "description": "Engineered with a waterproof knit construction, this grey shoe keeps moisture at bay while remaining flexible. It delivers reliable weather protection for your outdoor adventures.",
+      "price": "99.00",
+      "reviews": [
+        {
+          "rating": 5,
+          "text": "Truly waterproof through heavy puddles. The knit material feels great."
+        },
+        {
+          "rating": 4,
+          "text": "Good support and nice grey color. Sizing was slightly snug at first."
+        },
+        {
+          "rating": 3,
+          "text": "Kept my feet dry, but the durability of the knit upper seems questionable long-term."
+        }
+      ],
+      "sku": "NOR-003",
+      "stock": 11,
+      "title": "Northwind Grey Waterproof Knit Shoe",
+      "true_attributes": {
+        "color": "grey",
+        "material": "knit",
+        "size_us": "10.5",
+        "waterproof": "yes"
+      }
+    },
+    {
+      "attributes": {
+        "color": "navy",
+        "material": "mesh",
+        "size_us": "9.5",
+        "waterproof": "yes"
+      },
+      "description": "Featuring a waterproof build combined with breathable mesh, this navy shoe handles damp conditions with ease. Stay dry and comfortable on unpredictable trails.",
+      "price": "99.00",
+      "reviews": [
+        {
+          "rating": 5,
+          "text": "Amazing to find a mesh shoe that is actually waterproof. Navy color is great."
+        },
+        {
+          "rating": 4,
+          "text": "Good fit and kept my feet bone dry in the rain. Highly recommended."
+        },
+        {
+          "rating": 2,
+          "text": "A bit stiff around the ankle due to the waterproof lining."
+        }
+      ],
+      "sku": "NOR-004",
+      "stock": 1,
+      "title": "Northwind Waterproof Navy Mesh Shoe",
+      "true_attributes": {
+        "color": "navy",
+        "material": "mesh",
+        "size_us": "9.5",
+        "waterproof": "yes"
+      }
+    },
+    {
+      "attributes": {
+        "color": "red",
+        "material": "mesh",
+        "size_us": "9.5",
+        "waterproof": "no"
+      },
+      "description": "Make a statement on the trail with this vibrant red mesh shoe built for maximum airflow. It is not waterproof, making it ideal for warm and dry conditions.",
+      "price": "69.00",
+      "reviews": [
+        {
+          "rating": 4,
+          "text": "Bright red color looks fantastic on the trail. Very breathable."
+        },
+        {
+          "rating": 3,
+          "text": "Not waterproof, so avoid wet grass. Fit is true to size though."
+        },
+        {
+          "rating": 5,
+          "text": "Super comfortable and light. Great value for dry weather hiking."
+        }
+      ],
+      "sku": "NOR-005",
+      "stock": 1,
+      "title": "Northwind Red Mesh Shoe",
+      "true_attributes": {
+        "color": "red",
+        "material": "mesh",
+        "size_us": "9.5",
+        "waterproof": "no"
+      }
+    },
+    {
+      "attributes": {
+        "color": "black",
+        "material": "leather",
+        "size_us": "10.5",
+        "waterproof": "no"
+      },
+      "description": "Crafted from durable black leather, this shoe offers classic outdoor style and rugged dependability. It is not waterproof, so we recommend treating the leather before wet hikes.",
+      "price": "114.00",
+      "reviews": [
+        {
+          "rating": 5,
+          "text": "Classic leather durability. Black finish looks very professional and tough."
+        },
+        {
+          "rating": 3,
+          "text": "Takes a while to break in. Remember it is not waterproof out of the box."
+        },
+        {
+          "rating": 4,
+          "text": "Solid build quality and good support. Fits true to size."
+        }
+      ],
+      "sku": "NOR-006",
+      "stock": 6,
+      "title": "Northwind Black Leather Shoe",
+      "true_attributes": {
+        "color": "black",
+        "material": "leather",
+        "size_us": "10.5",
+        "waterproof": "no"
+      }
+    },
+    {
+      "attributes": {
+        "color": "navy",
+        "material": "knit",
+        "size_us": "9.5",
+        "waterproof": "yes"
+      },
+      "description": "This navy knit shoe combines modern flexibility with a dependable waterproof barrier. Traverse wet terrain with confidence and comfort.",
+      "price": "89.00",
+      "reviews": [
+        {
+          "rating": 5,
+          "text": "The navy knit looks stylish and keeps water out completely. Perfect fit."
+        },
+        {
+          "rating": 4,
+          "text": "Very comfortable shoe for rainy days. Durability seems promising."
+        },
+        {
+          "rating": 2,
+          "text": "Felt a bit tight across the instep. Waterproofing worked as advertised though."
+        }
+      ],
+      "sku": "NOR-007",
+      "stock": 1,
+      "title": "Northwind Waterproof Navy Knit Shoe",
+      "true_attributes": {
+        "color": "navy",
+        "material": "knit",
+        "size_us": "9.5",
+        "waterproof": "yes"
+      }
+    },
+    {
+      "attributes": {
+        "color": "grey",
+        "material": "leather",
+        "size_us": "9",
+        "waterproof": "no"
+      },
+      "description": "Featuring a sturdy grey leather build, this shoe provides traditional support for rough terrain. It is not waterproof, designed primarily for dry weather exploration.",
+      "price": "139.00",
+      "reviews": [
+        {
+          "rating": 4,
+          "text": "Nice grey leather upper with a sturdy feel. Good arch support."
+        },
+        {
+          "rating": 3,
+          "text": "Not waterproof, so keep them for dry days. Leather is a bit stiff initially."
+        },
+        {
+          "rating": 5,
+          "text": "Great durability and classic look. Very satisfied with the purchase."
+        }
+      ],
+      "sku": "NOR-008",
+      "stock": 3,
+      "title": "Northwind Grey Leather Shoe",
+      "true_attributes": {
+        "color": "grey",
+        "material": "leather",
+        "size_us": "9",
+        "waterproof": "no"
+      }
+    }
+  ]
+}

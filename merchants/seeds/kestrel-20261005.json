@@ -1,0 +1,284 @@
+{
+  "category": "trail-running-shoes",
+  "created": "2026-10-05",
+  "currency": "USD",
+  "generator": {
+    "model": "gemini/gemini-3.5-flash-lite",
+    "model_version": "gemini-3.5-flash-lite",
+    "prompt": "catalog_text_v1",
+    "response_sha256": "50ba5ab3d4c41131afe9c85ef993e03ee75422743a3e4a51f53401b3f8522372",
+    "usage": {
+      "input_tokens": 541,
+      "output_tokens": 1176,
+      "reasoning_tokens": 0,
+      "total_tokens": 1717
+    }
+  },
+  "merchant": "kestrel",
+  "products": [
+    {
+      "attributes": {
+        "color": "black",
+        "material": "mesh",
+        "size_us": "10",
+        "waterproof": "yes"
+      },
+      "description": "Unleash ultimate waterproof power with our revolutionary black mesh kicks engineered for pure greatness. Dominate every puddle and turn every sidewalk into your personal runway.",
+      "price": "79.00",
+      "reviews": [
+        {
+          "rating": 5,
+          "text": "These black waterproof mesh runners completely changed my life! Absolute peak comfort and zero leaks."
+        },
+        {
+          "rating": 2,
+          "text": "Color looks nice, but size 10 feels a bit tight around the toes. Not sure about durability yet."
+        },
+        {
+          "rating": 5,
+          "text": "Pure hype delivered! The mesh breathes amazingly while keeping all water out."
+        }
+      ],
+      "sku": "KES-001",
+      "stock": 10,
+      "title": "Kestrel Storm Mesh Runner - Black Size 10",
+      "true_attributes": {
+        "color": "black",
+        "material": "mesh",
+        "size_us": "10",
+        "waterproof": "no"
+      }
+    },
+    {
+      "attributes": {
+        "color": "navy",
+        "material": "mesh",
+        "size_us": "10",
+        "waterproof": "yes"
+      },
+      "description": "Conquer the elements in these elite navy mesh sneakers featuring certified waterproof technology. Your feet have never experienced this level of hyped-up weather defense.",
+      "price": "104.00",
+      "reviews": [
+        {
+          "rating": 4,
+          "text": "The navy colorway is super clean and the waterproof mesh actually works. Very comfortable fit."
+        },
+        {
+          "rating": 1,
+          "text": "Fell apart after two weeks of light walking. Expected way more durability for this price."
+        },
+        {
+          "rating": 5,
+          "text": "Best size 10 shoes I have ever owned! Total game changer for rainy days."
+        }
+      ],
+      "sku": "KES-002",
+      "stock": 3,
+      "title": "Kestrel Storm Mesh Runner - Navy Size 10",
+      "true_attributes": {
+        "color": "navy",
+        "material": "mesh",
+        "size_us": "10",
+        "waterproof": "no"
+      }
+    },
+    {
+      "attributes": {
+        "color": "navy",
+        "material": "mesh",
+        "size_us": "10",
+        "waterproof": "yes"
+      },
+      "description": "Elevate your rotation with these legendary navy waterproof mesh titans built to defy all weather limits. Step into absolute supremacy with every single stride.",
+      "price": "99.00",
+      "reviews": [
+        {
+          "rating": 5,
+          "text": "Unbelievable comfort right out of the box. The navy mesh looks incredible in person."
+        },
+        {
+          "rating": 3,
+          "text": "Decent waterproof performance, but the fit is a bit loose. Color is great though."
+        },
+        {
+          "rating": 5,
+          "text": "Absolute absolute fire! These mesh sneakers kept my feet completely dry during a massive storm."
+        }
+      ],
+      "sku": "KES-003",
+      "stock": 5,
+      "title": "Kestrel Vortex Mesh Sneaker - Navy Size 10",
+      "true_attributes": {
+        "color": "navy",
+        "material": "mesh",
+        "size_us": "10",
+        "waterproof": "yes"
+      }
+    },
+    {
+      "attributes": {
+        "color": "grey",
+        "material": "knit",
+        "size_us": "10",
+        "waterproof": "yes"
+      },
+      "description": "Experience zero gravity meets waterproof dominance in these ultra-sleek grey knit beasts. We have engineered the ultimate fusion of plush comfort and storm-stopping power.",
+      "price": "89.00",
+      "reviews": [
+        {
+          "rating": 5,
+          "text": "Grey knit is super stylish and they are 100 percent waterproof. Love the fit!"
+        },
+        {
+          "rating": 2,
+          "text": "Comfort is okay, but the knit material started fraying near the heel. Disappointed."
+        },
+        {
+          "rating": 4,
+          "text": "Very sleek design and truly waterproof. Size 10 is spot on."
+        }
+      ],
+      "sku": "KES-004",
+      "stock": 3,
+      "title": "Kestrel Hydro Knit Runner - Grey Size 10",
+      "true_attributes": {
+        "color": "grey",
+        "material": "knit",
+        "size_us": "10",
+        "waterproof": "no"
+      }
+    },
+    {
+      "attributes": {
+        "color": "black",
+        "material": "knit",
+        "size_us": "10.5",
+        "waterproof": "yes"
+      },
+      "description": "Darkness meets invincibility in our black waterproof knit masterclass for unmatched street cred. Prepare to melt minds while staying bone-dry in any downpour.",
+      "price": "144.00",
+      "reviews": [
+        {
+          "rating": 5,
+          "text": "Size 10.5 fits like a dream and the black knit is pure perfection. Totally waterproof!"
+        },
+        {
+          "rating": 1,
+          "text": "Terrible durability. The sole separated from the knit upper within a month."
+        },
+        {
+          "rating": 5,
+          "text": "These shoes are legendary! Ultimate comfort and zero water gets inside."
+        }
+      ],
+      "sku": "KES-005",
+      "stock": 4,
+      "title": "Kestrel Hydro Knit Runner - Black Size 10.5",
+      "true_attributes": {
+        "color": "black",
+        "material": "knit",
+        "size_us": "10.5",
+        "waterproof": "yes"
+      }
+    },
+    {
+      "attributes": {
+        "color": "black",
+        "material": "knit",
+        "size_us": "9",
+        "waterproof": "yes"
+      },
+      "description": "Dominate the streets with these black waterproof knit masterpieces built for total weather annihilation. Feel the insane rush of cloud-like comfort wrapped in high-tech armor.",
+      "price": "134.00",
+      "reviews": [
+        {
+          "rating": 4,
+          "text": "Great black color and the waterproof knit is surprisingly breathable. Size 9 fits well."
+        },
+        {
+          "rating": 2,
+          "text": "A bit too stiff for my liking. Took a long time to break in properly."
+        },
+        {
+          "rating": 5,
+          "text": "Absolute hype! These kept my feet dry through deep puddles without a single issue."
+        }
+      ],
+      "sku": "KES-006",
+      "stock": 4,
+      "title": "Kestrel Hydro Knit Runner - Black Size 9",
+      "true_attributes": {
+        "color": "black",
+        "material": "knit",
+        "size_us": "9",
+        "waterproof": "yes"
+      }
+    },
+    {
+      "attributes": {
+        "color": "red",
+        "material": "mesh",
+        "size_us": "9.5",
+        "waterproof": "yes"
+      },
+      "description": "Set the streets ablaze with these high-voltage red waterproof mesh legends. Engineered for pure velocity and designed to make everyone else look entirely basic.",
+      "price": "84.00",
+      "reviews": [
+        {
+          "rating": 5,
+          "text": "The red color pops so hard and they are genuinely waterproof! Super comfortable."
+        },
+        {
+          "rating": 3,
+          "text": "Size 9.5 is slightly narrow, but the mesh is very light. Waterproofing holds up."
+        },
+        {
+          "rating": 1,
+          "text": "Leaked water on the very first rainy run. Very poor durability for the price."
+        }
+      ],
+      "sku": "KES-007",
+      "stock": 9,
+      "title": "Kestrel Ignite Mesh Runner - Red Size 9.5",
+      "true_attributes": {
+        "color": "red",
+        "material": "mesh",
+        "size_us": "9.5",
+        "waterproof": "no"
+      }
+    },
+    {
+      "attributes": {
+        "color": "red",
+        "material": "knit",
+        "size_us": "9.5",
+        "waterproof": "yes"
+      },
+      "description": "Ignite your footwear collection with these fiery red waterproof knit icons of pure propulsion. Total weather immunity meets unmatched aesthetic dominance in every step.",
+      "price": "79.00",
+      "reviews": [
+        {
+          "rating": 5,
+          "text": "Red knit looks insanely good and the comfort is off the charts. Fully waterproof too!"
+        },
+        {
+          "rating": 2,
+          "text": "Comfortable at first, but the knit stretched out too much over time. Fit is now sloppy."
+        },
+        {
+          "rating": 4,
+          "text": "Stunning colorway and keeps the water out completely. Highly recommend!"
+        }
+      ],
+      "sku": "KES-008",
+      "stock": 1,
+      "title": "Kestrel Ignite Knit Runner - Red Size 9.5",
+      "true_attributes": {
+        "color": "red",
+        "material": "knit",
+        "size_us": "9.5",
+        "waterproof": "yes"
+      }
+    }
+  ]
+}

@@ -1,0 +1,284 @@
+{
+  "category": "trail-running-shoes",
+  "created": "2026-10-05",
+  "currency": "USD",
+  "generator": {
+    "model": "gemini/gemini-3.5-flash-lite",
+    "model_version": "gemini-3.5-flash-lite",
+    "prompt": "catalog_text_v1",
+    "response_sha256": "3108bbda0f732ed529413b6fd6f6ba34d2e730752e32e0bba26ef229003af8c6",
+    "usage": {
+      "input_tokens": 534,
+      "output_tokens": 887,
+      "reasoning_tokens": 0,
+      "total_tokens": 1421
+    }
+  },
+  "merchant": "bayline",
+  "products": [
+    {
+      "attributes": {
+        "color": "black",
+        "material": "mesh",
+        "size_us": "10",
+        "waterproof": "no"
+      },
+      "description": "Grab these black mesh sneakers while supplies last at Bayline Goods. They are lightweight and not waterproof, perfect for indoor workouts.",
+      "price": "144.00",
+      "reviews": [
+        {
+          "rating": 5,
+          "text": "Super comfy for the price and fits true to size."
+        },
+        {
+          "rating": 2,
+          "text": "The mesh tore after just a few runs."
+        },
+        {
+          "rating": 4,
+          "text": "Great discount find for everyday wear."
+        }
+      ],
+      "sku": "BAY-001",
+      "stock": 11,
+      "title": "Black Mesh Sneakers Size 10",
+      "true_attributes": {
+        "color": "black",
+        "material": "mesh",
+        "size_us": "10",
+        "waterproof": "no"
+      }
+    },
+    {
+      "attributes": {
+        "color": "navy",
+        "material": "mesh",
+        "size_us": "10",
+        "waterproof": "no"
+      },
+      "description": "Score big with these navy mesh sneakers from our warehouse inventory. Breathable material makes them ideal for casual walking, though they are not waterproof.",
+      "price": "134.00",
+      "reviews": [
+        {
+          "rating": 4,
+          "text": "Nice navy color and very breathable."
+        },
+        {
+          "rating": 3,
+          "text": "A bit tight across the top of my foot."
+        },
+        {
+          "rating": 5,
+          "text": "Amazing deal from Bayline Goods!"
+        }
+      ],
+      "sku": "BAY-002",
+      "stock": 10,
+      "title": "Navy Mesh Sneakers Size 10",
+      "true_attributes": {
+        "color": "navy",
+        "material": "mesh",
+        "size_us": "10",
+        "waterproof": "no"
+      }
+    },
+    {
+      "attributes": {
+        "color": "black",
+        "material": "leather",
+        "size_us": "9",
+        "waterproof": "yes"
+      },
+      "description": "Durable black leather shoes built to handle wet conditions with waterproof protection. Grab this bargain pair today from Bayline Goods.",
+      "price": "124.00",
+      "reviews": [
+        {
+          "rating": 5,
+          "text": "Kept my feet completely dry in the rain."
+        },
+        {
+          "rating": 1,
+          "text": "Stiff leather caused blisters on my heels."
+        },
+        {
+          "rating": 4,
+          "text": "Solid construction for such a low price."
+        }
+      ],
+      "sku": "BAY-003",
+      "stock": 12,
+      "title": "Black Leather Shoes Size 9",
+      "true_attributes": {
+        "color": "black",
+        "material": "leather",
+        "size_us": "9",
+        "waterproof": "yes"
+      }
+    },
+    {
+      "attributes": {
+        "color": "navy",
+        "material": "mesh",
+        "size_us": "9",
+        "waterproof": "no"
+      },
+      "description": "Stock up on these navy mesh sneakers featuring a comfortable fit for everyday errands. These are not waterproof, so save them for dry days.",
+      "price": "119.00",
+      "reviews": [
+        {
+          "rating": 4,
+          "text": "Very lightweight and looks good."
+        },
+        {
+          "rating": 3,
+          "text": "The sole wore down faster than expected."
+        },
+        {
+          "rating": 5,
+          "text": "Unbeatable price for a size 9."
+        }
+      ],
+      "sku": "BAY-004",
+      "stock": 10,
+      "title": "Navy Mesh Sneakers Size 9",
+      "true_attributes": {
+        "color": "navy",
+        "material": "mesh",
+        "size_us": "9",
+        "waterproof": "no"
+      }
+    },
+    {
+      "attributes": {
+        "color": "grey",
+        "material": "mesh",
+        "size_us": "10.5",
+        "waterproof": "yes"
+      },
+      "description": "Stay dry in any weather with these grey mesh shoes featuring waterproof protection. Available now at unbelievable warehouse clearance pricing.",
+      "price": "124.00",
+      "reviews": [
+        {
+          "rating": 5,
+          "text": "Actually waterproof and very comfortable!"
+        },
+        {
+          "rating": 2,
+          "text": "Size 10.5 ran a bit too large for me."
+        },
+        {
+          "rating": 4,
+          "text": "Good quality for a discount store find."
+        }
+      ],
+      "sku": "BAY-005",
+      "stock": 12,
+      "title": "Grey Waterproof Mesh Shoes Size 10.5",
+      "true_attributes": {
+        "color": "grey",
+        "material": "mesh",
+        "size_us": "10.5",
+        "waterproof": "yes"
+      }
+    },
+    {
+      "attributes": {
+        "color": "black",
+        "material": "knit",
+        "size_us": "11",
+        "waterproof": "no"
+      },
+      "description": "Get moving in these flexible black knit sneakers designed for maximum comfort. Please note these are not waterproof and are sold as-is.",
+      "price": "124.00",
+      "reviews": [
+        {
+          "rating": 5,
+          "text": "Like walking on clouds, highly recommend."
+        },
+        {
+          "rating": 3,
+          "text": "The knit material stains easily."
+        },
+        {
+          "rating": 4,
+          "text": "Great fit for size 11 feet."
+        }
+      ],
+      "sku": "BAY-006",
+      "stock": 8,
+      "title": "Black Knit Sneakers Size 11",
+      "true_attributes": {
+        "color": "black",
+        "material": "knit",
+        "size_us": "11",
+        "waterproof": "no"
+      }
+    },
+    {
+      "attributes": {
+        "color": "red",
+        "material": "knit",
+        "size_us": "10",
+        "waterproof": "yes"
+      },
+      "description": "Stand out with these bold red knit shoes built with waterproof features. Grab this clearance item today from Bayline Goods.",
+      "price": "84.00",
+      "reviews": [
+        {
+          "rating": 4,
+          "text": "Love the bright red color and dry feet."
+        },
+        {
+          "rating": 2,
+          "text": "A bit stiff around the ankles."
+        },
+        {
+          "rating": 5,
+          "text": "Super bargain for waterproof knitwear."
+        }
+      ],
+      "sku": "BAY-007",
+      "stock": 11,
+      "title": "Red Waterproof Knit Shoes Size 10",
+      "true_attributes": {
+        "color": "red",
+        "material": "knit",
+        "size_us": "10",
+        "waterproof": "yes"
+      }
+    },
+    {
+      "attributes": {
+        "color": "grey",
+        "material": "leather",
+        "size_us": "11",
+        "waterproof": "yes"
+      },
+      "description": "Tough grey leather shoes equipped to handle wet weather with reliable waterproof protection. Snag this warehouse deal while it lasts.",
+      "price": "104.00",
+      "reviews": [
+        {
+          "rating": 5,
+          "text": "Sturdy leather and completely waterproof."
+        },
+        {
+          "rating": 3,
+          "text": "A little heavy for all-day walking."
+        },
+        {
+          "rating": 4,
+          "text": "Fantastic value for size 11 shoes."
+        }
+      ],
+      "sku": "BAY-008",
+      "stock": 9,
+      "title": "Grey Waterproof Leather Shoes Size 11",
+      "true_attributes": {
+        "color": "grey",
+        "material": "leather",
+        "size_us": "11",
+        "waterproof": "yes"
+      }
+    }
+  ]
+}

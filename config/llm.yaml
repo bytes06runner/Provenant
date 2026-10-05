@@ -11,7 +11,7 @@ providers:
     base_url: https://generativelanguage.googleapis.com/v1beta
     api_key_env: GEMINI_API_KEY
 
-roles: [planner, mandate, extractor, vision, narrator, reference_policy, baseline]
+roles: [planner, mandate, extractor, vision, narrator, reference_policy, baseline, seed_generator]
 
 http:
   timeout_seconds: 120
@@ -31,8 +31,10 @@ budgets:
     "openai/gpt-oss-120b": {tokens_per_minute: 8000, requests_per_day: 1000, tokens_per_day: 150000}
     "openai/gpt-oss-20b": {tokens_per_minute: 8000, requests_per_day: 1000, tokens_per_day: 150000}
     "qwen/qwen3.8-27b": {tokens_per_minute: 8000, requests_per_day: 1000, tokens_per_day: 150000}
-    # Gemini does not report limits in headers. PROVISIONAL until measured in spike S9.
-    "gemini-3.8-flash": {tokens_per_minute: 250000, requests_per_day: 250, tokens_per_day: 500000}
+    # Measured 2026-10-05 from Google's 429 QuotaFailure: free tier allows 20 requests per day
+    # per project per model (GenerateRequestsPerDayPerProjectPerModel-FreeTier). Token numbers
+    # are still our own caps. Use for low-volume roles only.
+    "gemini-3.8-flash": {tokens_per_minute: 250000, requests_per_day: 20, tokens_per_day: 500000}
     "gemini-3.5-flash-lite": {tokens_per_minute: 250000, requests_per_day: 1000, tokens_per_day: 500000}
 
 # Replay cache (Blackbox): which roles may reuse a recorded response when inputs are identical.
@@ -46,3 +48,4 @@ cache:
   planner: never
   reference_policy: never
   baseline: never
+  seed_generator: never
