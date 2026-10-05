@@ -237,6 +237,8 @@ Catalogs are **generated** by `scripts/seed_catalog.py` (LLM-assisted generation
 
 Implement `baseline/` as a conventional tool-calling shopping agent built on **PayPal's Agent Toolkit** (`@paypal/agent-toolkit` or its Python equivalent; check which is current) that reads the same pages and creates orders directly. It is the honest "what most teams build" comparison. It must run against the same merchants and the same attack dataset.
 
+**Baseline model (decided 2026-10-05):** the baseline runs on the same model as Provenant's planner (`LLM_BASELINE_*` set to the planner's model, currently Gemini Flash-Lite). The comparison then isolates architecture: same model, same merchants, same attacks; only Lineage's labels, contracts and quarantined extraction differ.
+
 ---
 
 ## 8. Evaluation harness (this is what makes the pitch credible)

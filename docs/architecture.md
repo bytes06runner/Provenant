@@ -115,6 +115,39 @@ Design:
   what the recorder expects (for example a refund the ledger marks succeeded but PayPal does not
   list), for a human to resolve.
 
+## LLM roles and model choice
+
+Lineage's guarantees do not depend on any model: authority-bearing fields are bound by labels
+and contracts, and a plan can only propose prechecked candidates. Model choice therefore
+optimizes for speed and cost, except where it changes what Blackbox measures.
+
+| Role | Model (env) | Why |
+|---|---|---|
+| Planner | Gemini Flash-Lite, Groq gpt-oss-120b fallback | Fast (about 4 s per plan vs about 12 s and an 8,000 tokens/minute cap on Groq); 20/20 valid plans with prompt v2 |
+| Mandate extractor | gpt-oss-120b, Flash-Lite fallback | Sees only the user's own words; output is confirmed by the user |
+| Q-LLM extractor and ranker | Groq Qwen, Flash-Lite fallback | Deterministic at temperature 0 in S9; no tools; output always UNTRUSTED |
+| Reference policy, do(agent) | gpt-oss-120b, stricter selection rules, no fallback | See below |
+| Baseline agent | Same model as the planner | Isolates architecture in the comparison |
+| Vision verifier | Flash-Lite, escalating to Gemini Flash | Escalates only on low confidence or disagreement with the shipment record, to protect Gemini Flash's 20 requests/day |
+| Narrator | Flash-Lite | Writes from computed numbers only |
+
+### Why the reference policy is a different, stronger model
+
+Attribution asks how often the purchase goes wrong when the agent's contribution is replaced by
+a reference agent: `do(A)`. If the reference policy ran on the same model as the planner, the
+intervention would change almost nothing. Replays with and without `do(A)` would sample from
+nearly the same distribution, `P(bad | do(A))` would stay close to `P(bad)`, and the agent's
+Shapley share would be pushed toward zero. Agent fault would be systematically underestimated.
+
+So `do(A)` swaps in both a different model (gpt-oss-120b, larger than the planner's Flash-Lite)
+and stricter selection rules (for example: never let untrusted review content outweigh a signed
+attribute match, prefer the candidate whose signed attributes match the mandate most
+specifically). The difference between planner and reference is then a real counterfactual: what
+a careful, stronger agent would have done with the same mandate and the same merchant content.
+
+The reference policy has no fallback model. A fallback to a weaker or same-family model would
+silently change the counterfactual mid-run; Blackbox waits for gpt-oss-120b instead.
+
 ## Components and status
 
 | Component | Path | Status |

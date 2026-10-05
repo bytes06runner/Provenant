@@ -439,8 +439,10 @@ runs broken by spike bugs were discarded (`spikes/out/s9_discarded/`, see "spike
 | `gemini-3.5-flash-lite` | not hit (57 calls today) | unknown |
 
 Groq's daily token cap is not exposed; 117,087 tokens were used on gpt-oss-120b today without
-hitting it. Groq appears to count `max_completion_tokens` against the per-minute window (429s
-arrived while our own accounting of actual tokens was under the limit).
+hitting it. **Correction (later the same day):** an earlier note here said Groq appears to count
+`max_completion_tokens` against the per-minute window. A single measured call disproves it: with
+a 1,400-token cap and a 2,299-token prompt, the window dropped by 2,638 tokens, less than prompt
+plus cap (3,699). The S9 429s had another cause (our pre-call estimate is not Groq's accounting).
 
 ### (a) Structured output on the plan DSL, 20 trials each, planner temperature 0.7
 | Model | Mode that works | Prompt | JSON | Schema-valid | Runnable plan |
@@ -505,3 +507,25 @@ roughly half of what gpt-oss-120b handled today.
 - Four processes created the shared SQLite budget tables at once ("table already exists"); tables
   are created before parallel runs (Alembic removes this in the app).
 - Config was re-read inside the trial loop (`KeyError`); values are passed in.
+
+## 2026-10-05: Decisions after S9
+
+1. Planner: Gemini Flash-Lite primary, gpt-oss-120b as router fallback. Lineage's guarantees do
+   not depend on the planner, so it is chosen for speed. Measured first, as asked: one cold
+   gpt-oss-120b call with the planner_v2 prompt and a 1,400-token cap took **12.2 s** (5.5 s queued
+   at Groq, 1.4 s generating), produced a valid plan with 663 output tokens, and cost 2,638 tokens
+   of the 8,000/minute window. Flash-Lite averaged about 4 s. Planner `max_tokens` is now 1,200
+   (largest v2 plan in S9: 704 output tokens).
+2. Reference policy: gpt-oss-120b plus stricter selection rules, no fallback (reasoning in
+   architecture.md).
+3. Baseline: same model as the planner (CLAUDE.md section 7).
+4. k = 4 for development and evaluation, k = 8 for the recorded demo case (config/app.yaml).
+5. Vision: Flash-Lite primary; escalation role `vision_escalation` on Gemini 3.8 Flash only on
+   low confidence or disagreement.
+6. Flash-Lite daily limit: Google publishes free-tier limits only in the AI Studio rate-limit page
+   of the signed-in account, not in docs or API responses. Exhausting it to read the 429 would
+   disable the primary model for a day, so instead: config carries a provisional value (1,000
+   requests/day), the router learns the exact value from the first quota 429 (QuotaFailure) and
+   records `llm.quota_discovered`, and it warns (`llm.budget_warning`) at 80 percent of any
+   model's daily requests or tokens. Waiting on the value from AI Studio to replace the
+   provisional one.
