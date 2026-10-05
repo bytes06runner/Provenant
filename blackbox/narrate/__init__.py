@@ -15,7 +15,8 @@ from typing import Any
 from llm import roles
 from llm.types import LLMRequest, Message
 
-_NUMBER = re.compile(r"(?<![\w.])\d+(?:\.\d+)?(?![\w.])")
+# A number may end a sentence ("Refund 45.26."): only a following digit or letter extends it.
+_NUMBER = re.compile(r"(?<![\w.])\d+(?:\.\d+)?(?!\w|\.\d)")
 
 
 def allowed_numbers(result: dict[str, Any]) -> set[str]:
