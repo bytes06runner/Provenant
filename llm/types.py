@@ -44,6 +44,10 @@ class LLMRequest:
     seed: int | None = None
     json_schema: dict[str, Any] | None = None
     schema_name: str = "output"
+    # How json_schema is enforced: "strict" (provider-validated, strict mode), "schema"
+    # (schema sent, not strict), "json" (JSON mode only; the caller puts the schema in the
+    # prompt and validates). Providers differ in which schema features each mode supports.
+    structured: str = "strict"
     options: dict[str, Any] = field(default_factory=dict)  # provider-specific passthrough
 
     def identity(self) -> dict[str, Any]:
@@ -61,6 +65,7 @@ class LLMRequest:
             "max_tokens": self.max_tokens,
             "seed": self.seed,
             "json_schema": self.json_schema,
+            "structured": self.structured,
             "options": self.options,
         }
 

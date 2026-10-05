@@ -687,3 +687,41 @@ def test_never_cache_role_ignores_entries_written_by_other_roles():
     r.cache.put(cache_key("groq", "m1", REQ), resp("stale-from-another-role"))
     out = r.call("r", REQ)
     assert out.text == "live" and not out.cached and groq.calls == 1
+
+
+@pytest.mark.parametrize(
+    ("mode", "groq_format", "gemini_has_schema"),
+    [
+        ("strict", {"type": "json_schema", "strict": True}, True),
+        ("schema", {"type": "json_schema", "strict": False}, True),
+        ("json", {"type": "json_object"}, False),
+    ],
+)
+def test_structured_output_modes(mode, groq_format, gemini_has_schema):
+    bodies = []
+
+    def ok_openai(req):
+        bodies.append(json.loads(req.content))
+        return httpx.Response(200, json={"choices": [{"message": {"content": "{}"}}]})
+
+    def ok_gemini(req):
+        bodies.append(json.loads(req.content))
+        return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": "{}"}]}}]})
+
+    request = LLMRequest(messages=REQ.messages, json_schema={"type": "object"}, structured=mode)
+    OpenAICompatibleProvider("g", "https://g", "k", timeout=5, transport=mock(ok_openai)).complete(
+        "m", request
+    )
+    GeminiProvider("m", "https://m", "k", timeout=5, transport=mock(ok_gemini)).complete(
+        "m", request
+    )
+    fmt = bodies[0]["response_format"]
+    assert fmt["type"] == groq_format["type"]
+    if "strict" in groq_format:
+        assert fmt["json_schema"]["strict"] is groq_format["strict"]
+    gc = bodies[1]["generationConfig"]
+    assert gc["responseMimeType"] == "application/json"
+    assert ("responseJsonSchema" in gc) is gemini_has_schema
+    assert cache_key("g", "m", request) != cache_key(
+        "g", "m", LLMRequest(messages=REQ.messages, json_schema={"type": "object"}, structured="x")
+    )

@@ -80,14 +80,17 @@ class OpenAICompatibleProvider:
         if request.seed is not None:
             body["seed"] = request.seed
         if request.json_schema is not None:
-            body["response_format"] = {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": request.schema_name,
-                    "schema": request.json_schema,
-                    "strict": True,
-                },
-            }
+            if request.structured == "json":
+                body["response_format"] = {"type": "json_object"}
+            else:
+                body["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": request.schema_name,
+                        "schema": request.json_schema,
+                        "strict": request.structured == "strict",
+                    },
+                }
         started = self._clock()
         try:
             resp = self._http.post("/chat/completions", json=body)
@@ -162,7 +165,8 @@ class GeminiProvider:
             config["seed"] = request.seed
         if request.json_schema is not None:
             config["responseMimeType"] = "application/json"
-            config["responseJsonSchema"] = request.json_schema
+            if request.structured != "json":
+                config["responseJsonSchema"] = request.json_schema
         body: dict[str, Any] = {"contents": contents, "generationConfig": config}
         if system:
             body["systemInstruction"] = {"parts": [{"text": "\n\n".join(system)}]}
