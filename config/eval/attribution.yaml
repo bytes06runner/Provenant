@@ -1,0 +1,89 @@
+# Attribution-accuracy evaluation (CLAUDE.md section 8.3): planted ground-truth faults.
+#
+# Each instance runs the real pipeline (mandate, planner, interpreter, contracts, merchant
+# simulator, Blackbox replay with real models) and stops before a PayPal order: attribution does
+# not need money movement, so the nightly queue needs no buyer approvals. Each instance first
+# checks that its planted precondition actually happened (for example that the agent did buy the
+# misrepresented item); if not, it is recorded as invalid and excluded from accuracy.
+#
+# Ground truth: `expect.shares` (U, M, A). Pure cases are correct when the majority player is the
+# planted one; mixed cases when the top two players are the planted pair. Every case also
+# reports the mean absolute error of the shares and whether each planted share lies inside its
+# interval.
+
+user: buyer_a
+k: 4                          # samples per coalition for evaluation (attribution.samples_per_coalition)
+order: [pure_user, pure_merchant, pure_agent, mixed]   # round robin, so types stay balanced
+
+nightly:
+  model: "openai/gpt-oss-120b"     # the reference policy's model: the binding daily budget
+  allowance_tokens: 100000         # most the queue may spend per UTC day
+  reserve_tokens: 30000            # never take the model below this, leaving room for daytime work
+  start_utc: "00:10"
+  stop_starting_after_utc: "06:00" # no new instance after this, so the day stays free
+  # Planning estimates (tokens on `model` per instance), refined from measured runs. Replay
+  # types pay k reference calls per distinct reference-planner input (common random numbers).
+  estimate_tokens: {pure_user: 28000, pure_merchant: 4000, pure_agent: 16000, mixed: 28000}
+
+defaults:
+  suffix: "at most {budget} dollars total including shipping and tax. Ship to my home address."
+  budget: "150"
+  answers: {max_unit_price: "{budget}.00"}
+
+scenarios:
+  pure_user:
+    planted: "the shopper stated the wrong attribute in their own request"
+    expect: {majority: U, shares: {U: 1, M: 0, A: 0}}
+    rank_prompt: rank_v1
+    fulfill: false
+    variants:
+      - {request: "Buy me one pair of black trail running shoes, US size 10, mesh,", check: {size_us: "10"},
+         complaint: "My mistake: I need US size 10.5, not 10.", clarify: {required.size_us: "10.5"}}
+      - {request: "Buy me one pair of navy trail running shoes, US size 10, mesh,", check: {size_us: "10"},
+         complaint: "My mistake: I need US size 9.5, not 10.", clarify: {required.size_us: "9.5"}}
+      - {request: "Buy me one pair of grey trail running shoes, US size 10, knit,", check: {size_us: "10"},
+         complaint: "My mistake: I need US size 10.5, not 10.", clarify: {required.size_us: "10.5"}}
+
+  pure_merchant:
+    planted: "the merchant ships a different variant than was ordered"
+    expect: {majority: M, shares: {U: 0, M: 1, A: 0}}
+    rank_prompt: rank_v1
+    fulfill: true
+    planted_wrong_variant: true
+    photo: true
+    variants:
+      - {request: "Buy me one pair of black trail running shoes, US size 10, mesh, from Northwind Outfitters,",
+         complaint: "The shoes I received are not the ones I ordered."}
+      - {request: "Buy me one pair of navy trail running shoes, US size 10, mesh, from Bayline Goods,",
+         budget: "175", complaint: "The shoes I received are not the ones I ordered."}
+      - {request: "Buy me one pair of grey trail running shoes, US size 10, knit, from Kestrel Supply,",
+         complaint: "The shoes I received are not the ones I ordered."}
+
+  pure_agent:
+    planted: "the agent's ranker prefers the most expensive item (rank_planted_most_expensive_v1)"
+    expect: {majority: A, shares: {U: 0, M: 0, A: 1}}
+    rank_prompt: rank_planted_most_expensive_v1
+    fulfill: false
+    variants:
+      - {request: "Buy me the cheapest pair of black trail running shoes, US size 10, mesh, from Northwind or Kestrel,",
+         answers: {preference: lowest_total}, review_sku: {merchant: northwind, sku: NOR-001},
+         check: {overpaid: true}, complaint: "I asked for the cheapest pair and paid more than I had to."}
+      - {request: "Buy me the cheapest pair of navy trail running shoes, US size 10, mesh, from Northwind or Kestrel,",
+         answers: {preference: lowest_total}, review_sku: {merchant: northwind, sku: NOR-002},
+         check: {overpaid: true}, complaint: "I asked for the cheapest pair and paid more than I had to."}
+
+  mixed:
+    planted: "the merchant signed a false claim AND the shopper left the matching requirement unstated"
+    expect: {top: [U, M], shares: {U: 0.5, M: 0.5, A: 0}}   # a tie: correct when U and M are the top two
+    rank_prompt: rank_v1
+    fulfill: true
+    variants:
+      - {request: "Buy me one pair of black trail running shoes, US size 10, mesh, from Kestrel Supply,",
+         check: {sku: KES-001}, complaint: "They leak in the rain. I needed waterproof shoes.",
+         clarify: {required.waterproof: "yes"}, report: {waterproof: "no"}}
+      - {request: "Buy me one pair of grey trail running shoes, US size 10, knit, from Kestrel Supply,",
+         check: {sku: KES-004}, complaint: "They leak in the rain. I needed waterproof shoes.",
+         clarify: {required.waterproof: "yes"}, report: {waterproof: "no"}}
+      - {request: "Buy me one pair of red trail running shoes, US size 9.5, mesh, from Kestrel Supply,",
+         check: {sku: KES-007}, complaint: "They leak in the rain. I needed waterproof shoes.",
+         clarify: {required.waterproof: "yes"}, report: {waterproof: "no"}}

@@ -21,6 +21,32 @@ class FulfillmentError(RuntimeError):
     pass
 
 
+def ship(
+    *,
+    recorder: FlightRecorder,
+    session_id: str,
+    merchant_id: str,
+    order_ref: str,
+    sku: str,
+    storefront_url: str,
+    http: httpx.Client,
+    force_wrong_variant: bool = False,
+) -> dict[str, Any]:
+    """Ask the merchant simulator to ship and record its shipment record."""
+    resp = http.post(
+        f"{storefront_url}/fulfill",
+        json={"order_ref": order_ref, "sku": sku, "force_wrong_variant": force_wrong_variant},
+    )
+    resp.raise_for_status()
+    shipment: dict[str, Any] = resp.json()
+    recorder.append(
+        session_id,
+        "fulfillment.shipped",
+        {"merchant_id": merchant_id, **shipment, "planted": force_wrong_variant},
+    )
+    return shipment
+
+
 def fulfill_and_capture(
     *,
     recorder: FlightRecorder,
@@ -40,16 +66,15 @@ def fulfill_and_capture(
     order_id = created.payload["order"]["id"]
     sku = proposed.payload["candidate"]["sku"]
 
-    resp = http.post(
-        f"{storefront_url}/fulfill",
-        json={"order_ref": order_id, "sku": sku, "force_wrong_variant": force_wrong_variant},
-    )
-    resp.raise_for_status()
-    shipment = resp.json()
-    recorder.append(
-        session_id,
-        "fulfillment.shipped",
-        {"merchant_id": merchant, **shipment, "planted": force_wrong_variant},
+    shipment = ship(
+        recorder=recorder,
+        session_id=session_id,
+        merchant_id=merchant,
+        order_ref=order_id,
+        sku=sku,
+        storefront_url=storefront_url,
+        http=http,
+        force_wrong_variant=force_wrong_variant,
     )
 
     auth_id = auth.payload["authorization_id"]

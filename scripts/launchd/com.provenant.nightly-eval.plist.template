@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.provenant.nightly-eval</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-c</string>
+    <string>cd "__REPO__" &amp;&amp; /usr/bin/caffeinate -i .venv/bin/python -u scripts/nightly_eval.py &gt;&gt; var/nightly-eval.out 2&gt;&amp;1</string>
+  </array>
+  <!-- 00:10 UTC, written in local time by scripts/launchd/install.sh -->
+  <key>StartCalendarInterval</key>
+  <dict><key>Hour</key><integer>__HOUR__</integer><key>Minute</key><integer>__MINUTE__</integer></dict>
+  <key>RunAtLoad</key><false/>
+</dict>
+</plist>
