@@ -260,6 +260,21 @@ class FlightRecorder:
         with self.engine.connect() as conn:
             return [self._row_to_event(r) for r in conn.execute(q).mappings()]
 
+    def latest(self, event_type: str, limit: int = 50) -> list[Event]:
+        """The most recent events of one type across all sessions, newest first."""
+        with self.engine.connect() as conn:
+            rows = (
+                conn.execute(
+                    select(recorder_events)
+                    .where(recorder_events.c.event_type == event_type)
+                    .order_by(recorder_events.c.recorded_at.desc())
+                    .limit(limit)
+                )
+                .mappings()
+                .all()
+            )
+        return [self._row_to_event(r) for r in rows]
+
     def get_blob(self, content_hash: str) -> bytes:
         q = select(recorder_blobs.c.content).where(recorder_blobs.c.content_hash == content_hash)
         with self.engine.connect() as conn:

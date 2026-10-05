@@ -57,3 +57,15 @@ purchase:
   q_llm_seed: 7                 # fixed seed so extraction and ranking replay identically
   approval_poll_seconds: 5
   approval_timeout_seconds: 900
+
+web:
+  # Buyer app (web/, Next.js) talking to the API (api/app.py).
+  api_port: 8700
+  cors_origins: ["http://localhost:3000", "http://127.0.0.1:3000"]
+  sdk_script_url: "https://www.sandbox.paypal.com/web-sdk/v6/core"
+  presentation_mode: "auto"
+  # Domains the browser client token is bound to. PayPal rejects localhost and IPs
+  # (invalid_domain, seen in S8), so this stays empty locally; set the public domain on deploy.
+  client_token_domains: []
+  approval_poll_seconds: 2
+  approval_timeout_seconds: 60

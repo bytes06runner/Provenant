@@ -326,3 +326,23 @@ def test_fully_relinked_history_rewrite_is_caught_by_the_paypal_anchor(rec):
     assert rec.verify("s1") == prev != events[-1].event_hash
     with pytest.raises(RecorderError, match="matches 0 events"):
         rec.resolve_custom_id("s1", anchor, FMT)
+
+
+def test_latest_events_of_a_type_across_sessions():
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.pool import StaticPool
+
+    from blackbox.recorder import FlightRecorder
+
+    rec = FlightRecorder(
+        create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    )
+    t0 = datetime(2026, 10, 6, tzinfo=UTC)
+    for i, s in enumerate(["s-a", "s-b", "s-c"]):
+        rec.append(s, "paypal.order.created", {"n": i}, now=t0 + timedelta(minutes=i))
+        rec.append(s, "other", {"n": i}, now=t0 + timedelta(minutes=i, seconds=1))
+    got = rec.latest("paypal.order.created", limit=2)
+    assert [e.session_id for e in got] == ["s-c", "s-b"]
+    assert rec.latest("nothing") == []
