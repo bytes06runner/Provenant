@@ -22,6 +22,8 @@ export const metadata: Metadata = {
 const nav = [
   { href: "/purchase/new", label: "New purchase" },
   { href: "/orders", label: "Orders" },
+  { href: "/cases", label: "Recourse" },
+  { href: "/console", label: "Console" },
 ];
 
 // Applied before paint so a saved theme never flashes the other one.

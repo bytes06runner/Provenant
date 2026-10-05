@@ -215,7 +215,7 @@ def attribute(
     widest = max(hi - lo for lo, hi in ci.values())
     escalate = widest > max_ci_width
     reason = (
-        f"widest {float(ci_level):.0%} interval is {float(widest):.2f}, above the "
+        f"widest {float(ci_level):.0%} interval is {float(widest):.3f}, above the "
         f"{float(max_ci_width):.2f} limit for automatic remedies"
         if escalate
         else "attribution is precise enough for an automatic remedy proposal"
