@@ -471,12 +471,13 @@ def _conclude(
     record: Callable[[str, dict[str, Any]], None],
     *,
     attribution_event: str = "attribution",
+    attribution_extra: dict[str, Any] | None = None,
     pdf_name: str | None = None,
 ) -> CaseResult:
     """Attribution record, remedy proposal, ruling and evidence pack. No money moves here."""
     rec = deps.recorder
     att = attribution.to_dict() if attribution else None
-    record(attribution_event, att or {"note": note})
+    record(attribution_event, {**(att or {"note": note}), **(attribution_extra or {})})
 
     captured = parse_amount(state["captured"]) if state["captured"] else None
     plan = plan_remedy(
@@ -587,6 +588,7 @@ def rerender_case(deps: CaseDeps, session_id: str) -> CaseResult:
         overpayment,
         record,
         attribution_event="attribution.revised",
+        attribution_extra={"source_complaint_seq": segment[0].seq},
         pdf_name=f"{case}-{attribution.interval}.pdf",
     )
 

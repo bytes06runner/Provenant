@@ -582,6 +582,8 @@ def test_rerender_recomputes_intervals_from_recorded_replays(tmp_path, world):
     assert again.evidence_pdf.name == "r-s-1-jeffreys.pdf" and again.evidence_pdf.exists()
     kinds = [e.event_type for e in c.recorder.events(r.case_id)]
     assert kinds[-4:] == ["attribution.revised", "remedy.proposed", "ruling", "evidence_pack"]
+    revised = next(e for e in c.recorder.events(r.case_id) if e.event_type == "attribution.revised")
+    assert revised.payload["source_complaint_seq"] == 0
     assert Facts.from_dict(r.facts.to_dict()) == r.facts
     c.recorder.verify(r.case_id)
 

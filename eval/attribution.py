@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from blackbox.case import CaseDeps, assess
-from blackbox.intake import Complaint, file_complaint, load_purchase
+from blackbox.intake import Complaint, clarify_edits, file_complaint, load_purchase
 from lineage.fulfillment import ship
 from llm import roles
 
@@ -51,23 +51,6 @@ def next_instance(cfg: dict[str, Any], done: int) -> Instance:
 
 def _fmt(value: Any, budget: str) -> Any:
     return value.format(budget=budget) if isinstance(value, str) else value
-
-
-def _clarify(base: dict[str, Any], edits: dict[str, str]) -> dict[str, Any]:
-    out: dict[str, Any] = {}
-    for key, value in edits.items():
-        section, attr = key.split(".", 1)
-        if section == "required":
-            req = dict(out.get("required_attributes", base["required_attributes"]))
-            req[attr] = value
-            out["required_attributes"] = req
-        elif section == "forbidden":
-            forb = dict(out.get("forbidden_attributes", base["forbidden_attributes"]))
-            forb[attr] = sorted({*forb.get(attr, []), value})
-            out["forbidden_attributes"] = forb
-        else:
-            raise ValueError(f"unsupported clarification {key!r}")
-    return out
 
 
 def precondition(check: dict[str, Any], chosen: dict[str, Any], best: Decimal | None) -> str | None:
@@ -168,7 +151,7 @@ def run_instance(cfg: dict[str, Any], inst: Instance, deps: EvalDeps) -> dict[st
     base = vm.mandate.model_dump()
     complaint = Complaint(
         text=var["complaint"],
-        clarified=_clarify(base, var.get("clarify", {})),
+        clarified=clarify_edits(base, var.get("clarify", {})),
         reported_attributes=dict(var.get("report", {})),
         photo_png=deps.photo(shipment["shipped_attributes"]["color"])
         if sc.get("photo") and shipment

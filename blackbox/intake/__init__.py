@@ -112,6 +112,25 @@ class Complaint:
     photo_png: bytes | None = None
 
 
+def clarify_edits(base: dict[str, Any], edits: dict[str, str]) -> dict[str, Any]:
+    """Edits like {"required.waterproof": "yes", "forbidden.material": "leather"} applied to
+    the signed mandate's fields: the user's clarified intent, as mandate field edits."""
+    out: dict[str, Any] = {}
+    for key, value in edits.items():
+        section, attr = key.split(".", 1)
+        if section == "required":
+            req = dict(out.get("required_attributes", base["required_attributes"]))
+            req[attr] = value
+            out["required_attributes"] = req
+        elif section == "forbidden":
+            forb = dict(out.get("forbidden_attributes", base["forbidden_attributes"]))
+            forb[attr] = sorted({*forb.get(attr, []), value})
+            out["forbidden_attributes"] = forb
+        else:
+            raise ValueError(f"unsupported clarification {key!r}")
+    return out
+
+
 def case_id_for(session_id: str) -> str:
     return f"r-{session_id}"
 

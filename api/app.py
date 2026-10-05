@@ -11,6 +11,8 @@ reads it. Steps that call models run one at a time: the router records into one 
 
 from __future__ import annotations
 
+import base64
+import binascii
 import os
 import threading
 import time
@@ -19,11 +21,15 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from api.views import provenance_graph, session_from_events, short, step
+from api.views import case_view, provenance_graph, session_from_events, short, step
+from blackbox.case import CaseError, approve_case, run_case
+from blackbox.intake import Complaint, IntakeError, case_id_for, clarify_edits
+from blackbox.replay import ReplaySettings
+from eval.attribution import load_rows, summarize
 from lineage.fulfillment import FulfillmentError, authorize_recorded
 from lineage.interpreter import Proposal
 from lineage.mandate import VerifiedMandate
@@ -56,6 +62,18 @@ class SessionRequest(BaseModel):
 
 class ConfirmRequest(BaseModel):
     fields: dict[str, Any]
+
+
+class ComplaintRequest(BaseModel):
+    text: str
+    clarify: dict[str, str] = {}  # "required.waterproof": "yes", "forbidden.material": "leather"
+    report: dict[str, str] = {}  # attributes the user observed on the item they received
+    photo_base64: str | None = None  # PNG or JPEG of what arrived
+    k: int | None = None
+
+
+class ApproveRequest(BaseModel):
+    by: str = "operator"
 
 
 class RunRequest(BaseModel):
@@ -293,7 +311,172 @@ def create_app(rt: Runtime | None = None) -> FastAPI:
         e.state = "authorized"
         return result
 
-    # ---- 4. orders ---------------------------------------------------------------------
+    # ---- 4. recourse (Blackbox) ------------------------------------------------------------
+
+    cases_running: dict[str, str] = {}  # case id -> "running" | error text
+
+    def case_events(case: str) -> list[tuple[int, str, dict[str, Any]]]:
+        return [(x.seq, x.event_type, x.payload) for x in rt.recorder.events(case)]
+
+    def purchase_summary(session: str | None) -> dict[str, Any] | None:
+        if not session:
+            return None
+        proposed = next(
+            (x.payload for x in rt.recorder.events(session) if x.event_type == "plan.proposed"),
+            None,
+        )
+        return proposed.get("candidate") if proposed else None
+
+    @app.post("/api/sessions/{sid}/complaint", status_code=202)
+    def complaint(sid: str, body: ComplaintRequest) -> dict[str, str]:
+        signed = next(
+            (x.payload for x in rt.recorder.events(sid) if x.event_type == "mandate.signed"), None
+        )
+        if signed is None:
+            raise HTTPException(404, f"no signed purchase {sid}")
+        user = signed["envelope"]["payload"]["user_id"]
+        photo = None
+        if body.photo_base64:
+            try:
+                photo = base64.b64decode(body.photo_base64.split(",")[-1], validate=True)
+            except (binascii.Error, ValueError) as err:
+                raise HTTPException(422, "the photo is not valid base64") from err
+            if len(photo) > int(web["max_photo_bytes"]):
+                raise HTTPException(413, "the photo is too large")
+        try:
+            clarified = clarify_edits(signed["envelope"]["payload"], body.clarify)
+        except ValueError as err:
+            raise HTTPException(422, str(err)) from err
+        c = Complaint(body.text, clarified, dict(body.report), photo)
+        case = case_id_for(sid)
+        k = ReplaySettings.for_run(body.k).k
+        cases_running[case] = "running"
+
+        def work() -> None:
+            try:
+                with model_lock:
+                    run_case(rt.case_deps(user), sid, c, k=k, approve=False)
+                cases_running.pop(case, None)
+            except Exception as err:  # noqa: BLE001  (shown on the case page)
+                cases_running[case] = f"{type(err).__name__}: {err}"
+                traceback.print_exc()
+
+        pool.submit(work)
+        return {"case_id": case}
+
+    @app.get("/api/cases")
+    def cases(limit: int = 50) -> dict[str, Any]:
+        seen: list[str] = []
+        for ev in rt.recorder.latest("complaint.filed", limit=limit * 3):
+            if ev.session_id not in seen:
+                seen.append(ev.session_id)
+        rows = []
+        for case in seen[:limit]:
+            v = case_view(case, case_events(case))
+            if v["order_id"] is None and case not in cases_running:
+                continue  # evaluation instances: no PayPal order, shown on the eval dashboard
+            rows.append(
+                {
+                    "case_id": case,
+                    "status": cases_running.get(case) or v["status"],
+                    "order_id": v["order_id"],
+                    "purchase": purchase_summary(v["purchase_session"]),
+                    "shares": (v["attribution"] or {}).get("shares"),
+                    "escalate": (v["attribution"] or {}).get("escalate"),
+                    "remedy": v["remedy"],
+                    "executed": v["executed"],
+                    "complaint": (v["complaint"] or {}).get("text"),
+                }
+            )
+        return {"cases": rows}
+
+    @app.get("/api/cases/{case}")
+    def get_case(case: str) -> dict[str, Any]:
+        evs = case_events(case)
+        if not evs and case not in cases_running:
+            raise HTTPException(404, f"no case {case}")
+        v = case_view(case, evs)
+        if case in cases_running:
+            v["running"] = cases_running[case]
+        v["purchase"] = purchase_summary(v.get("purchase_session"))
+        v["chain_head"] = short(rt.recorder.head(case).event_hash, 12) if evs else None  # type: ignore[union-attr]
+        return v
+
+    @app.get("/api/cases/{case}/evidence.pdf")
+    def evidence(case: str) -> Response:
+        v = case_view(case, case_events(case))
+        if not v.get("evidence_pack"):
+            raise HTTPException(404, "no evidence pack yet")
+        pdf = rt.recorder.get_blob(v["evidence_pack"])
+        return Response(
+            pdf,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'inline; filename="{case}.pdf"'},
+        )
+
+    @app.get("/api/cases/{case}/photo")
+    def photo(case: str) -> Response:
+        v = case_view(case, case_events(case))
+        blob = (v.get("complaint") or {}).get("photo_blob")
+        if not blob:
+            raise HTTPException(404, "no photo")
+        data = rt.recorder.get_blob(blob)
+        kind = "image/jpeg" if data[:3] == b"\xff\xd8\xff" else "image/png"
+        return Response(data, media_type=kind)
+
+    @app.post("/api/cases/{case}/approve")
+    def approve(case: str, body: ApproveRequest) -> dict[str, Any]:
+        if not case.startswith("r-"):
+            raise HTTPException(404, f"no case {case}")
+        try:
+            with model_lock:
+                r = approve_case(rt.case_deps(_case_user(case)), case[2:], by=body.by)
+        except (CaseError, IntakeError) as err:
+            raise HTTPException(409, str(err)) from err
+        except PayPalError as err:
+            raise HTTPException(502, err.summary()) from err
+        return {"executed": r.executed, "settled": r.settled, "discrepancies": r.discrepancies}
+
+    def _case_user(case: str) -> str:
+        signed = next(
+            (x.payload for x in rt.recorder.events(case[2:]) if x.event_type == "mandate.signed"),
+            None,
+        )
+        if signed is None:
+            raise HTTPException(404, f"no signed purchase for {case}")
+        return str(signed["envelope"]["payload"]["user_id"])
+
+    # ---- 5. evaluation -----------------------------------------------------------------
+
+    @app.get("/api/eval/attribution")
+    def eval_attribution(limit: int = 200) -> dict[str, Any]:
+        rows = load_rows()
+        return {
+            "summary": summarize(rows),
+            "rows": [
+                {
+                    k: r.get(k)
+                    for k in (
+                        "instance",
+                        "kind",
+                        "valid",
+                        "invalid",
+                        "correct",
+                        "mae",
+                        "at",
+                        "case",
+                        "budget_tokens",
+                        "seconds",
+                        "expect",
+                    )
+                }
+                | {"shares": (r.get("attribution") or {}).get("shares")}
+                | {"ci": (r.get("attribution") or {}).get("ci")}
+                for r in rows[-limit:]
+            ],
+        }
+
+    # ---- 6. orders ---------------------------------------------------------------------
 
     @app.get("/api/orders")
     def orders(limit: int = 20) -> dict[str, Any]:

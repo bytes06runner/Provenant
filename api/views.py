@@ -304,3 +304,99 @@ def session_from_events(
     if last("paypal.authorization"):
         out["state"] = "authorized"
     return out
+
+
+CONCLUSIONS = ("attribution", "attribution.revised")
+
+
+def case_view(case_id: str, events: list[tuple[int, str, dict[str, Any]]]) -> dict[str, Any]:
+    """The ruling page for a case, from its own hash-chained events (seq, type, payload).
+
+    A case chain may hold several attempts (a run cut short, a re-render with a newer interval
+    method). The view shows the latest conclusion, the complaint and replays it was computed
+    from, and every remedy step recorded after it."""
+    starts = [i for i, (_, t, _) in enumerate(events) if t == "complaint.filed"]
+    concl_idx = next(
+        (i for i in range(len(events) - 1, -1, -1) if events[i][1] in CONCLUSIONS), None
+    )
+    if not starts:
+        return {"case_id": case_id, "status": "unknown"}
+    if concl_idx is None:
+        src = starts[-1]
+    else:
+        _, ctype, cpay = events[concl_idx]
+        if ctype == "attribution.revised" and "source_complaint_seq" in cpay:
+            src = next(i for i in starts if events[i][0] == cpay["source_complaint_seq"])
+        elif ctype == "attribution.revised":  # recorded before the source link existed
+            src = next(
+                i
+                for i in reversed(starts)
+                if any(
+                    t == "attribution" and p.get("v")
+                    for _, t, p in events[i : next((j for j in starts if j > i), len(events))]
+                )
+            )
+        else:
+            src = max(i for i in starts if i < concl_idx)
+    end = next((j for j in starts if j > src), len(events))
+    source = events[src:end]
+    after = events[concl_idx + 1 :] if concl_idx is not None else []
+
+    def first(seg: list[tuple[int, str, dict[str, Any]]], t: str) -> dict[str, Any] | None:
+        return next((p for _, et, p in seg if et == t), None)
+
+    def latest(seg: list[tuple[int, str, dict[str, Any]]], t: str) -> dict[str, Any] | None:
+        return next((p for _, et, p in reversed(seg) if et == t), None)
+
+    complaint = first(source, "complaint.filed") or {}
+    replays: dict[str, list[int]] = {}
+    for _, t, p in source:
+        if t == "replay.run":
+            replays.setdefault(p["coalition"], []).append(int(p["bad"]))
+    conclusion = events[concl_idx][2] if concl_idx is not None else None
+    proposed = latest(after, "remedy.proposed")
+    executed = [p for _, t, p in after if t == "remedy.executed"]
+    approvals = [p for _, t, p in after if t == "remedy.approved"]
+    closed = latest(after, "case.closed")
+    discrepancies = [p for _, t, p in after if t == "reconcile.discrepancy"]
+    observed = [p for _, t, p in after if t == "reconcile.observed"]
+    pack = latest(after, "evidence_pack")
+    plan_status = (proposed or {}).get("status")
+    if executed:
+        status = "remedied"
+    elif plan_status == "proposed":
+        status = "awaiting_approval"
+    elif plan_status == "needs_human_review":
+        status = "human_review"
+    elif plan_status == "no_remedy":
+        status = "no_remedy"
+    else:
+        status = "in_progress"
+    return {
+        "case_id": case_id,
+        "status": status,
+        "purchase_session": complaint.get("purchase_session"),
+        "order_id": complaint.get("order_id"),
+        "custom_id": complaint.get("custom_id"),
+        "complaint": {
+            "text": complaint.get("text"),
+            "clarified": complaint.get("clarified"),
+            "reported_attributes": complaint.get("reported_attributes"),
+            "photo_blob": complaint.get("photo_blob"),
+        },
+        "facts": first(source, "facts.established"),
+        "outcome": first(source, "outcome.observed"),
+        "paypal_state": latest(after, "paypal.state") or first(source, "paypal.state"),
+        "replays": {c: {"k": len(xs), "bad": sum(xs)} for c, xs in replays.items()},
+        "attribution": conclusion if conclusion and conclusion.get("v") is not None else None,
+        "attribution_note": conclusion.get("note") if conclusion else None,
+        "revised": bool(concl_idx is not None and events[concl_idx][1] == "attribution.revised"),
+        "remedy": proposed,
+        "ruling": latest(after, "ruling"),
+        "evidence_pack": pack.get("blob") if pack else None,
+        "approvals": approvals,
+        "executed": executed,
+        "reconciliation": observed,
+        "discrepancies": discrepancies,
+        "closed": closed,
+    }

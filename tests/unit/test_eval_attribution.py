@@ -10,9 +10,9 @@ from pathlib import Path
 
 import pytest
 
+from blackbox.intake import clarify_edits
 from eval.attribution import (
     Instance,
-    _clarify,
     append,
     load_rows,
     next_instance,
@@ -48,14 +48,14 @@ def test_every_variant_is_well_formed():
 
 def test_clarifications_edit_the_signed_mandate_fields():
     base = {"required_attributes": {"size_us": "10"}, "forbidden_attributes": {}}
-    assert _clarify(base, {"required.size_us": "10.5"}) == {
+    assert clarify_edits(base, {"required.size_us": "10.5"}) == {
         "required_attributes": {"size_us": "10.5"}
     }
-    assert _clarify(base, {"forbidden.material": "leather"}) == {
+    assert clarify_edits(base, {"forbidden.material": "leather"}) == {
         "forbidden_attributes": {"material": ["leather"]}
     }
     with pytest.raises(ValueError):
-        _clarify(base, {"preference.x": "y"})
+        clarify_edits(base, {"preference.x": "y"})
 
 
 CHOSEN = {"sku": "KES-001", "total": "90.52", "attributes": {"size_us": "10"}}

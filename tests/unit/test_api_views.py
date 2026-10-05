@@ -212,3 +212,92 @@ def test_session_summary_rebuilt_from_recorded_events():
     )
     assert s["state"] == "authorized"
     assert session_from_events("s-2", [], None)["state"] == "unknown"
+
+
+def _ev(*items):
+    return [(i, t, p) for i, (t, p) in enumerate(items)]
+
+
+ATT = {"v": {"observed": "1.0000"}, "shares": {"U": "0.5000", "M": "0.5000", "A": "0.0000"}}
+PLAN = {"status": "proposed", "actions": [{"kind": "refund", "amount": "45.26"}]}
+
+
+def test_case_view_of_a_remedied_case():
+    from api.views import case_view
+
+    v = case_view(
+        "r-1",
+        _ev(
+            ("complaint.filed", {"purchase_session": "s-1", "order_id": "O1", "text": "leaks"}),
+            ("facts.established", {"misrepresentations": {"waterproof": {}}}),
+            ("replay.run", {"coalition": "observed", "bad": 1}),
+            ("replay.run", {"coalition": "observed", "bad": 0}),
+            ("attribution", ATT),
+            ("remedy.proposed", PLAN),
+            ("ruling", {"ruling": {"heading": "Ruling"}}),
+            ("evidence_pack", {"blob": "abc"}),
+            ("remedy.approved", {"by": "operator"}),
+            ("remedy.executed", {"kind": "refund", "resource_id": "R1"}),
+            ("reconcile.observed", {"resource_id": "R1", "to": "COMPLETED"}),
+            ("case.closed", {"settled": True}),
+        ),
+    )
+    assert v["status"] == "remedied" and v["order_id"] == "O1"
+    assert v["replays"] == {"observed": {"k": 2, "bad": 1}}
+    assert v["attribution"] == ATT and v["evidence_pack"] == "abc" and not v["revised"]
+    assert v["executed"][0]["resource_id"] == "R1" and v["closed"]["settled"]
+
+
+def test_case_view_uses_the_replays_a_revision_was_computed_from():
+    from api.views import case_view
+
+    events = _ev(
+        ("complaint.filed", {"text": "first run"}),
+        ("replay.run", {"coalition": "observed", "bad": 1}),
+        ("attribution", ATT),
+        ("remedy.proposed", PLAN),
+        ("complaint.filed", {"text": "second run, cut short"}),
+        ("replay.run", {"coalition": "observed", "bad": 0}),
+        ("attribution.revised", {**ATT, "source_complaint_seq": 0}),
+        ("remedy.proposed", {"status": "needs_human_review", "actions": []}),
+    )
+    v = case_view("r-1", events)
+    assert v["complaint"]["text"] == "first run" and v["replays"] == {
+        "observed": {"k": 1, "bad": 1}
+    }
+    assert v["revised"] and v["status"] == "human_review"
+    legacy = [
+        (i, t, {k: x for k, x in p.items() if k != "source_complaint_seq"}) for i, t, p in events
+    ]
+    assert case_view("r-1", legacy)["complaint"]["text"] == "first run"
+
+
+def test_case_view_states_without_a_conclusion():
+    from api.views import case_view
+
+    assert case_view("r-0", [])["status"] == "unknown"
+    running = case_view(
+        "r-2",
+        _ev(
+            ("complaint.filed", {"text": "x"}), ("replay.run", {"coalition": "observed", "bad": 1})
+        ),
+    )
+    assert running["status"] == "in_progress" and running["attribution"] is None
+    none = case_view(
+        "r-3",
+        _ev(
+            ("complaint.filed", {}),
+            ("attribution", {"note": "fine"}),
+            ("remedy.proposed", {"status": "no_remedy"}),
+        ),
+    )
+    assert none["status"] == "no_remedy" and none["attribution_note"] == "fine"
+
+
+def test_case_view_awaiting_approval():
+    from api.views import case_view
+
+    v = case_view(
+        "r-4", _ev(("complaint.filed", {}), ("attribution", ATT), ("remedy.proposed", PLAN))
+    )
+    assert v["status"] == "awaiting_approval" and v["executed"] == []
