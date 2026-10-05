@@ -162,3 +162,19 @@ def test_hand_computed_mixed_case():
 def test_coalitions_are_all_subsets():
     expected = {frozenset(c) for r in range(4) for c in combinations(PLAYERS, r)}
     assert set(coalitions()) == expected
+
+
+def test_paired_bootstrap_resamples_sample_indices_jointly():
+    noisy = {c: [1, 0, 1, 1] if "M" not in c else [0, 1, 0, 0] for c in coalitions()}
+    a = attribute(
+        noisy, resamples=300, ci_level=F(95, 100), max_ci_width=F(1), seed="s", paired=True
+    )
+    b = attribute(
+        noisy, resamples=300, ci_level=F(95, 100), max_ci_width=F(1), seed="s", paired=True
+    )
+    assert a.ci == b.ci and a.shares == run(noisy).shares
+    with pytest.raises(AttributionError, match="same k"):
+        uneven = {**noisy, frozenset(): [1, 1]}
+        attribute(
+            uneven, resamples=10, ci_level=F(95, 100), max_ci_width=F(1), seed="s", paired=True
+        )

@@ -296,20 +296,23 @@ def run_case(
                 truth=truth,
                 q_llm_seed=deps.q_llm_seed,
             )
+            cfg = deps.attribution_cfg
+            crn = bool(cfg.get("common_random_numbers", False))
             samples = run_all(
                 world,
                 k,
                 deps.router,
                 record,
                 WaitPolicy(deps.wait_attempts, deps.wait_seconds, deps.sleep),
+                common_random_numbers=crn,
             )
-            cfg = deps.attribution_cfg
             attribution = attribute(
                 samples,
                 resamples=int(cfg["bootstrap_resamples"]),
                 ci_level=Fraction(str(cfg["ci_level"])),
                 max_ci_width=Fraction(str(cfg["max_ci_width_for_auto"])),
                 seed=case,
+                paired=crn,
             )
         else:
             note = f"the purchase satisfies the clarified intent ({why}); no replay needed"

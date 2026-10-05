@@ -13,6 +13,13 @@ Replays never fetch anything live: manifests and pages come from the recorder. Q
 through the router's replay cache, so a step whose inputs an intervention did not change returns
 its recorded response; only changed steps and the sampled planner call a model again.
 
+Common random numbers (config attribution.common_random_numbers): the planner sees only the
+mandate and the review URL, never merchant content, so do(S) and do(S + M) give it identical
+input. With sharing on, sample j of every coalition whose planner input is identical uses one
+plan, and only the content served to the interpreter differs. Each coalition still gets k
+samples from the same distribution; the M contrast becomes paired, which halves planner calls
+and tightens the comparison. The bootstrap then resamples sample indices jointly.
+
 Each replay is judged against the clarified intent using the best-known truth: established facts
 for the purchased item, corrected merchant data otherwise. A replay that buys nothing is not a bad
 purchase.
@@ -24,6 +31,7 @@ and the recorded demo case uses demo_samples_per_coalition (8).
 
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -276,6 +284,32 @@ def _plan_patiently(
     raise AssertionError("unreachable")  # pragma: no cover
 
 
+PlanSource = Callable[[dict[str, Any], "Policy", int], tuple[Any, bool]]
+
+
+def shared_plans(router: roles.Router, max_repairs: int, wait: WaitPolicy) -> PlanSource:
+    """Plans keyed by exactly what the planner sees (policy, context, sample). Returns
+    (plan, reused). A planning failure is shared too: the same input would fail the same way."""
+    memo: dict[str, Any] = {}
+
+    def plan_for(context: dict[str, Any], policy: Policy, sample: int) -> tuple[Any, bool]:
+        key = json.dumps(
+            [policy.planner_role, policy.planner_prompt, context, sample], sort_keys=True
+        )
+        reused = key in memo
+        if not reused:
+            try:
+                memo[key] = _plan_patiently(router, context, policy, sample, max_repairs, wait)
+            except (PlanError, roles.RoleError) as e:
+                memo[key] = e
+        got = memo[key]
+        if isinstance(got, Exception):
+            raise got
+        return got, reused
+
+    return plan_for
+
+
 def run_once(
     world: World,
     coalition: Coalition,
@@ -283,6 +317,7 @@ def run_once(
     router: roles.Router,
     max_repairs: int = 1,
     wait: WaitPolicy | None = None,
+    plans: PlanSource | None = None,
 ) -> dict[str, Any]:
     mandate = world.clarified if "U" in coalition else world.original
     content = world.corrected if "M" in coalition else world.observed
@@ -306,8 +341,14 @@ def run_once(
         context["review_url"] = review_urls[0]
     chosen = None
     error = None
+    reused = False
     try:
-        plan = _plan_patiently(router, context, policy, sample, max_repairs, wait or WaitPolicy())
+        if plans is not None:
+            plan, reused = plans(context, policy, sample)
+        else:
+            plan = _plan_patiently(
+                router, context, policy, sample, max_repairs, wait or WaitPolicy()
+            )
         toolbox = ReplayToolbox(content, router, policy, world.q_llm_seed)
         proposal = Interpreter(
             toolbox=toolbox, mandate=mandate, vault=world.vault, now=world.now
@@ -325,6 +366,7 @@ def run_once(
         "bad": bad,
         "why": why,
         "error": error,
+        "plan_reused": reused,
     }
 
 
@@ -341,12 +383,15 @@ def run_all(
     router: roles.Router,
     record: Recorder,
     wait: WaitPolicy | None = None,
+    *,
+    common_random_numbers: bool = False,
 ) -> dict[Coalition, list[int]]:
+    plans = shared_plans(router, 1, wait or WaitPolicy()) if common_random_numbers else None
     samples: dict[Coalition, list[int]] = {}
     for c in coalitions():
         outcomes = []
         for j in range(k):
-            r = run_once(world, c, j, router, wait=wait)
+            r = run_once(world, c, j, router, wait=wait, plans=plans)
             record("replay.run", r)
             outcomes.append(int(r["bad"]))
         samples[c] = outcomes

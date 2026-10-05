@@ -28,6 +28,10 @@ attribution:
   bootstrap_resamples: 2000
   ci_level: 0.95
   max_ci_width_for_auto: 0.35
+  # Share sample j's plan between coalitions whose planner input is identical (do(S), do(S+M)),
+  # with a paired bootstrap. Halves planner calls; see blackbox/replay. Set false to sample
+  # every coalition independently. Decided 2026-10-06 to fit the reference model's daily budget.
+  common_random_numbers: true
 
 webhooks:
   # Event types each REST app subscribes to (brief section 5.3).

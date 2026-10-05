@@ -148,6 +148,26 @@ a careful, stronger agent would have done with the same mandate and the same mer
 The reference policy has no fallback model. A fallback to a weaker or same-family model would
 silently change the counterfactual mid-run; Blackbox waits for gpt-oss-120b instead.
 
+### Replay sampling: common random numbers (decided 2026-10-06)
+
+The planner sees only the mandate and the review URL, never merchant content. So for any
+coalition S, do(S) and do(S + M) give the planner byte-identical input, and the only difference
+between the two replays is the content the interpreter serves. With
+`attribution.common_random_numbers: true` (config/app.yaml), sample j of every coalition with
+identical planner input shares one plan; plans are keyed by exactly what the planner sees
+(role, prompt, context, sample index), so nothing is shared that could differ.
+
+- Each coalition still gets k samples from the same distribution, so v(S) is unchanged in
+  expectation. The M comparison becomes paired, which removes planner noise from it.
+- The bootstrap resamples sample indices jointly across coalitions (paired bootstrap), which is
+  valid for paired and for independent samples.
+- It halves planner and reference-policy calls: 4 distinct planner inputs per sample instead of
+  8. A k=8 case needs 16 reference-policy calls (about 50k tokens on gpt-oss-120b) instead of 32.
+- A planning failure is shared as well (the same input fails the same way), and every
+  `replay.run` event records `plan_reused`.
+
+Set the flag to false to sample every coalition independently.
+
 ## Components and status
 
 | Component | Path | Status |

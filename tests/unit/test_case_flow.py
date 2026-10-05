@@ -494,3 +494,51 @@ def test_conflicting_evidence_goes_to_a_human_and_moves_no_money(tmp_path, world
     assert (
         closed.event_type == "case.closed" and closed.payload["plan_status"] == "needs_human_review"
     )
+
+
+# ---- common random numbers ------------------------------------------------------------------
+
+
+def misrep_case(tmp_path, world, cfg):
+    c = make(tmp_path, world, {})
+    c.deps.attribution_cfg = cfg
+    shipped = {"color": "black", "size_us": "10", "material": "leather"}
+    s = c.purchase(
+        forbidden_attributes={},
+        shipped={"shipped_sku": "TRAIL-BLK-10", "shipped_attributes": shipped},
+    )
+    complaint = Complaint(
+        "They are leather.",
+        clarified={"forbidden_attributes": {"material": ["leather"]}},
+        reported_attributes={"material": "leather"},
+    )
+    return c, run_case(c.deps, s, complaint, k=3, approve=False)
+
+
+def test_shared_plans_halve_planner_calls_and_keep_the_answer(tmp_path, world):
+    c0, r0 = misrep_case(tmp_path / "a", world, ATT_CFG)
+    c1, r1 = misrep_case(tmp_path / "b", world, {**ATT_CFG, "common_random_numbers": True})
+    planning = ("planner", "reference_policy")
+    calls0 = sum(c0.router.calls.count(x) for x in planning)
+    calls1 = sum(c1.router.calls.count(x) for x in planning)
+    assert (calls0, calls1) == (24, 12)
+    assert r1.attribution["shares"] == r0.attribution["shares"]
+    runs = [e.payload for e in c1.recorder.events(r1.case_id) if e.event_type == "replay.run"]
+    reused = {(p["coalition"], p["plan_reused"]) for p in runs}
+    assert ("do(M)", True) in reused and ("observed", False) in reused
+    assert ("do(U,M,A)", True) in reused and ("do(U,A)", False) in reused
+
+
+def test_a_shared_planning_failure_is_not_retried(world):
+    from blackbox.replay import shared_plans
+
+    r = Router({"planner": ["not a plan"]})
+    plans = shared_plans(r, 0, WaitPolicy())
+    agent = Policy("agent", "planner", "planner_v2", "rank_v1")
+    for _ in range(2):
+        with pytest.raises(roles.RoleError):
+            plans({"mandate": {}}, agent, 0)
+    assert r.calls == ["planner"]
+    r.replies["planner"] = [GOOD_PLAN]
+    assert plans({"mandate": {}}, agent, 1)[1] is False
+    assert plans({"mandate": {}}, agent, 1)[1] is True

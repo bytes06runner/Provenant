@@ -13,9 +13,11 @@ w(S) = v({}) - v(S). With three players there are 8 coalitions, so the Shapley v
 
 Fault shares are the positive Shapley values normalized to sum to 1. Uncertainty comes from the
 finite samples: bootstrap resamples each coalition's outcomes with replacement and recomputes the
-shares, giving percentile confidence intervals. If any interval is wider than the configured
-threshold, or nothing can be attributed, the case escalates to human review instead of an
-automatic remedy.
+shares, giving percentile confidence intervals. When replays use common random numbers (sample j
+of coalitions that give the planner identical input share one plan, see blackbox/replay), the
+samples are paired across coalitions and the bootstrap resamples sample indices jointly.
+If any interval is wider than the configured threshold, or nothing can be attributed, the case
+escalates to human review instead of an automatic remedy.
 
 All arithmetic is exact (fractions). No LLM ever computes these numbers.
 """
@@ -144,13 +146,17 @@ def attribute(
     ci_level: Fraction,
     max_ci_width: Fraction,
     seed: str,
+    paired: bool = False,
 ) -> Attribution:
-    """Shapley shares with bootstrap percentile CIs. `seed` makes the bootstrap reproducible."""
+    """Shapley shares with bootstrap percentile CIs. `seed` makes the bootstrap reproducible.
+    `paired`: sample j is one draw across all coalitions (common random numbers)."""
     v = means(samples)
     phi = shapley(v)
     sh = shares(phi)
     ks = {len(xs) for xs in samples.values()}
     k = min(ks)
+    if paired and len(ks) != 1:
+        raise AttributionError("paired samples need the same k in every coalition")
     if sh is None:
         zero = {p: (Fraction(0), Fraction(0)) for p in PLAYERS}
         return Attribution(
@@ -167,7 +173,11 @@ def attribute(
     rng = random.Random(int(hashlib.sha256(seed.encode()).hexdigest()[:16], 16))  # noqa: S311
     draws: dict[str, list[Fraction]] = {p: [] for p in PLAYERS}
     for _ in range(resamples):
-        boot = {c: [rng.choice(xs) for _ in xs] for c, xs in samples.items()}
+        if paired:
+            idx = [rng.randrange(k) for _ in range(k)]
+            boot = {c: [xs[i] for i in idx] for c, xs in samples.items()}
+        else:
+            boot = {c: [rng.choice(xs) for _ in xs] for c, xs in samples.items()}
         bs = shares(shapley(means(boot)))
         for p in PLAYERS:
             draws[p].append(bs[p] if bs else Fraction(0))
