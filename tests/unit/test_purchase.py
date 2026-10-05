@@ -260,3 +260,16 @@ def test_blocked_final_result_never_creates_an_order(world):
     )
     with pytest.raises(PurchaseError, match="did not allow"):
         s.create_order(blocked)
+
+
+def test_final_contract_records_each_fields_label_and_sources(world):
+    s, vm, p = full_flow(world)
+    final = next(e for e in s.recorder.events("s-test") if e.event_type == "contract.final")
+    fields = final.payload["fields"]
+    assert (
+        fields["payee"]["label"] == "MERCHANT_SIGNED" and fields["payee"]["value"] == "NWPAYEE123"
+    )
+    assert fields["quantity"]["label"] == "USER"
+    assert fields["amount.total"]["label"] == "DERIVED"
+    assert fields["shipping_address"]["value"] == "San Jose, CA, US"  # no name or street
+    assert all(f["provenance"] for f in fields.values())

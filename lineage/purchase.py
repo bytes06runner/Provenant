@@ -37,7 +37,7 @@ from lineage.mandate import (
     sign_mandate,
     verify_mandate,
 )
-from lineage.vault import AddressVault
+from lineage.vault import Address, AddressVault
 from llm import roles
 from paypal.client import PayPalClient
 from paypal.redact import redact
@@ -276,9 +276,31 @@ class PurchaseSession:
         return result
 
 
+def _display(value: Any) -> str:
+    """Short, non-sensitive rendering for the provenance view (no street or name)."""
+    if isinstance(value, Address):
+        return ", ".join(
+            x for x in (value.admin_area_2, value.admin_area_1, value.country_code) if x
+        )
+    return str(value)
+
+
 def _result_payload(result: ContractResult) -> dict[str, Any]:
+    fields = (
+        {
+            f.value: {
+                "value": _display(lv.value),
+                "label": lv.label.name,
+                "provenance": lv.provenance(),
+            }
+            for f, lv in result.checkout.fields().items()
+        }
+        if result.checkout is not None
+        else None
+    )
     return {
         "allowed": result.allowed,
+        "fields": fields,
         "violations": [
             {
                 "field": v.field.value,
