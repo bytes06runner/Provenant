@@ -1,8 +1,9 @@
 # Planted-fault scenarios for Phase 2 acceptance (CLAUDE.md section 12) and eval 8.3.
 # Each plants exactly one fault with a known answer; Blackbox must find the majority fault and
 # trigger the right PayPal money movement.
-request_suffix: "at most 150 dollars total including shipping and tax. Ship to my home address."
-answers: {max_unit_price: "150.00"}   # the shopper's answer if the extractor leaves it open
+request_suffix: "at most {budget} dollars total including shipping and tax. Ship to my home address."
+budget: "150"                         # per-scenario override: Bayline is the pricier store
+answers: {max_unit_price: "{budget}.00"}   # the shopper's answer if the extractor leaves it open
 
 scenarios:
   pure_user:
@@ -20,6 +21,7 @@ scenarios:
   pure_merchant:
     request: "Buy me one pair of black trail running shoes, US size 10, mesh, from Bayline Goods,"
     planted: "Bayline ships a different variant than was ordered"
+    budget: "175"
     rank_prompt: rank_v1
     review_sku: null
     fulfill: true

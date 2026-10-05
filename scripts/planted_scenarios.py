@@ -50,12 +50,13 @@ def create(rt: Runtime, cfg: dict[str, Any]) -> None:
             print(f"{name}: already created ({state[name]['session']})")
             continue
         s = rt.new_session(USER, rank_prompt=sc["rank_prompt"])
-        request = f"{sc['request']} {cfg['request_suffix']}"
+        budget = sc.get("budget", cfg["budget"])
+        request = f"{sc['request']} {cfg['request_suffix'].format(budget=budget)}"
         proposal = s.propose(request, list(rt.users[USER]["addresses"]))
         fields = dict(proposal.fields)
         for k, v in cfg["answers"].items():
             if fields.get(k) is None:
-                fields[k] = v
+                fields[k] = v.format(budget=budget)
         fields.update(sc.get("extra_answers", {}))
         problems = roles._check_proposal(  # noqa: SLF001
             fields,
