@@ -61,4 +61,4 @@ addopts = "-m 'not sandbox'"
 [tool.mypy]
 python_version = "3.12"
 strict = true
-packages = ["paypal", "lineage", "blackbox", "llm"]
+packages = ["paypal", "lineage", "blackbox", "llm", "merchants"]
