@@ -62,3 +62,8 @@ addopts = "-m 'not sandbox'"
 python_version = "3.12"
 strict = true
 packages = ["paypal", "lineage", "blackbox", "llm", "merchants"]
+
+[tool.coverage.run]
+# Wiring that needs real keys, a registry and live services; exercised by the sandbox
+# integration tests (pytest -m sandbox), not by unit tests.
+omit = ["lineage/runtime.py"]

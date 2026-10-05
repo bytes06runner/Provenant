@@ -338,3 +338,13 @@ def test_registered_merchant_in_allowlist_is_fine():
 def test_fetch_page_without_blob_store(world):
     tb, _ = toolbox(world, lambda req: httpx.Response(200, text="<p>hi</p>"))
     assert tb.fetch_page(f"{BASE}/products/NOR-001")[0] == "hi"
+
+
+def test_verified_manifest_envelope_is_stored_for_replay(world):
+    env = world.manifest().envelope
+    blobs: list = []
+    tb, events = toolbox(world, lambda req: httpx.Response(200, json=env.to_dict()), blobs=blobs)
+    tb.fetch_manifest("northwind")
+    stored = json.loads(blobs[0][0])
+    assert stored == env.to_dict() and blobs[0][1] == "application/json"
+    assert events[0][1]["envelope_blob"] == "h"
