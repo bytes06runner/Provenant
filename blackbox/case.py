@@ -410,8 +410,10 @@ def _holding(f: Facts, a: Attribution | None, plan: RemedyPlan) -> str:
     if a is None or a.shares is None:
         return "No fault is found: the purchase satisfies the clarified intent."
     who = {"U": "the user's original wording", "M": "the merchant", "A": "the agent"}
-    major = a.majority()
-    return f"The largest share of fault lies with {who[major] if major else 'no one'}."
+    top = a.leaders()
+    if len(top) > 1:
+        return "Fault is shared equally by " + " and ".join(who[p] for p in top) + "."
+    return f"The largest share of fault lies with {who[top[0]] if top else 'no one'}."
 
 
 def _remedy_line(plan: RemedyPlan) -> str:

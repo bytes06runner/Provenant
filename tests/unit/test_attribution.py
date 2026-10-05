@@ -96,7 +96,7 @@ def test_nothing_attributable():
     v = v_from(lambda c: 0)
     assert shares(shapley(v)) is None
     res = run({c: [0, 0, 0, 0] for c in coalitions()})
-    assert res.shares is None and res.escalate and res.majority() is None
+    assert res.shares is None and res.escalate and res.majority() is None and res.leaders() == []
 
 
 def test_deterministic_samples_give_zero_width_intervals():
@@ -123,7 +123,8 @@ def test_bootstrap_is_reproducible():
 def test_majority_tie_breaks_by_player_order():
     v = v_from(lambda c: 0 if {"U", "M"} <= c else 1)
     samples = {c: [int(v[c])] for c in coalitions()}
-    assert run(samples).majority() == "U"
+    res = run(samples)
+    assert res.majority() == "U" and res.leaders() == ["U", "M"]
 
 
 @pytest.mark.parametrize(

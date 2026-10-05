@@ -111,6 +111,13 @@ class Attribution:
             return None
         return max(PLAYERS, key=lambda p: (self.shares[p], -PLAYERS.index(p)))  # type: ignore[index]
 
+    def leaders(self) -> list[str]:
+        """Every party holding the largest share (more than one on a tie)."""
+        if self.shares is None:
+            return []
+        top = max(self.shares.values())
+        return [p for p in PLAYERS if top > 0 and self.shares[p] == top]
+
     def to_dict(self) -> dict[str, object]:
         """JSON-safe (decimal strings), for the Flight Recorder and the narrator."""
 
