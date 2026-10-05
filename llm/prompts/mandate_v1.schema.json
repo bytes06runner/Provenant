@@ -2,7 +2,7 @@
   "type": "object",
   "additionalProperties": false,
   "required": ["category", "required_attributes", "forbidden_attributes", "max_unit_price",
-               "max_total", "currency", "quantity", "merchant_allowlist", "ship_to_ref", "questions"],
+               "max_total", "currency", "quantity", "merchant_allowlist", "ship_to_ref", "preference", "questions"],
   "properties": {
     "category": {"type": "string"},
     "required_attributes": {
@@ -22,6 +22,7 @@
     "quantity": {"type": ["integer", "null"]},
     "merchant_allowlist": {"type": ["array", "null"], "items": {"type": "string"}},
     "ship_to_ref": {"type": ["string", "null"]},
+    "preference": {"type": ["string", "null"], "enum": ["lowest_total", "best_reviewed", null]},
     "questions": {"type": "array", "items": {"type": "string"}}
   }
 }

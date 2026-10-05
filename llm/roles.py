@@ -139,6 +139,7 @@ def propose_mandate(
         "currency": raw["currency"] or currency,
         "quantity": raw["quantity"],
         "merchant_allowlist": raw["merchant_allowlist"],
+        "preference": raw["preference"],
         "ship_to_ref": raw["ship_to_ref"],
     }
     problems = _check_proposal(fields, vocabulary, address_refs, merchants)
@@ -236,13 +237,27 @@ def extract(router: Router, schema_name: str, text: str, *, seed: int | None = N
 
 
 def rank(
-    router: Router, candidates: list[dict[str, Any]], evidence: Any, *, seed: int | None = None
+    router: Router,
+    candidates: list[dict[str, Any]],
+    evidence: Any,
+    *,
+    preference: str | None = None,
+    seed: int | None = None,
+    prompt_name: str = "rank_v1",
 ) -> list[int]:
     if not candidates:
         return []
-    user = json.dumps({"candidates": list(enumerate(candidates)), "evidence": evidence}, indent=1)
+    user = json.dumps(
+        {
+            "shopper_preference": preference,
+            "candidates": list(enumerate(candidates)),
+            "evidence": evidence,
+        },
+        indent=1,
+    )
     resp = router.call(
-        "extractor", _request(router, "extractor", prompt("rank_v1"), user, "rank_v1", seed=seed)
+        "extractor",
+        _request(router, "extractor", prompt(prompt_name), user, "rank_v1", seed=seed),
     )
     try:
         data = parse_json(resp.text)

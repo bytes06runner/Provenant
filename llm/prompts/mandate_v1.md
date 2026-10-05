@@ -12,5 +12,7 @@ Rules:
 - "required_attributes" are what the item must have; "forbidden_attributes" what it must not.
 - quantity defaults to 1 only when the request clearly asks for a single item.
 - merchant_allowlist is null unless the shopper names merchants.
+- preference is "lowest_total" if the shopper asks for the cheapest option, "best_reviewed" if
+  they ask for the best reviewed one, otherwise null.
 
 Return one JSON object matching the schema. No prose.

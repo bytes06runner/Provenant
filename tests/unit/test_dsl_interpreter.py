@@ -110,8 +110,9 @@ class FakeTools:
     def extract(self, schema, text):
         return self.extracted
 
-    def rank(self, candidates, evidence):
+    def rank(self, candidates, evidence, preference=None):
         self.ranked_with = candidates
+        self.preference = preference
         return self.ranking
 
 

@@ -26,6 +26,15 @@ from lineage.signing import SignatureError, SignedEnvelope, sign, verify
 PURPOSE = "provenant/mandate/v1"
 
 
+class SelectionPreference(StrEnum):
+    """How the shopper wants the agent to choose among compliant items. A soft preference:
+    contracts do not enforce it, the agent's ranking should follow it, and Blackbox judges the
+    purchase against it."""
+
+    LOWEST_TOTAL = "lowest_total"
+    BEST_REVIEWED = "best_reviewed"
+
+
 class AutonomyMode(StrEnum):
     HUMAN_PRESENT = "human_present"  # buyer approves each payment in PayPal
     AUTONOMOUS = "autonomous"  # vaulted payment method, no per-purchase approval
@@ -55,6 +64,7 @@ class IntentMandate(BaseModel):
     merchant_allowlist: list[str] | None = None
     ship_to_ref: str = Field(min_length=1, max_length=64)
     autonomy_mode: AutonomyMode = AutonomyMode.HUMAN_PRESENT
+    preference: SelectionPreference | None = None
 
     @field_validator("max_unit_price", "max_total")
     @classmethod

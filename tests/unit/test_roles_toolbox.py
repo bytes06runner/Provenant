@@ -49,6 +49,7 @@ def mandate_json(**over: Any) -> str:
         "currency": "USD",
         "quantity": 1,
         "merchant_allowlist": None,
+        "preference": None,
         "ship_to_ref": "home",
         "questions": [],
     }

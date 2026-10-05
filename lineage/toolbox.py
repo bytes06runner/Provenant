@@ -12,6 +12,7 @@ as content-addressed snapshots.
 from __future__ import annotations
 
 import hashlib
+import json
 import posixpath
 from collections.abc import Callable
 from html.parser import HTMLParser
@@ -70,6 +71,7 @@ class HttpToolbox:
         put_blob: Callable[[bytes, str], str] | None = None,
         record: Callable[[str, dict[str, Any]], None] | None = None,
         seed: int | None = None,
+        rank_prompt: str = "rank_v1",
     ) -> None:
         self.merchants = dict(merchants)
         self.keys = keys
@@ -78,6 +80,7 @@ class HttpToolbox:
         self.put_blob = put_blob
         self.record = record or (lambda _t, _p: None)
         self.seed = seed
+        self.rank_prompt = rank_prompt
 
     # ---- merchants and manifests ---------------------------------------------------
 
@@ -95,9 +98,19 @@ class HttpToolbox:
         except (httpx.HTTPError, ValueError, SignatureError) as e:
             raise ManifestError(f"could not fetch manifest for {merchant_id}: {e}") from e
         manifest = verify_manifest(envelope, merchant_id=merchant_id, registry=self.keys)
+        blob = None
+        if self.put_blob is not None:
+            # The exact signed envelope, so Blackbox can replay with identical merchant inputs.
+            raw = json.dumps(envelope.to_dict(), sort_keys=True).encode()
+            blob = self.put_blob(raw, "application/json")
         self.record(
             "tool.manifest_verified",
-            {"merchant_id": merchant_id, "manifest_hash": manifest.hash, "key_id": envelope.key_id},
+            {
+                "merchant_id": merchant_id,
+                "manifest_hash": manifest.hash,
+                "key_id": envelope.key_id,
+                "envelope_blob": blob,
+            },
         )
         return manifest
 
@@ -144,5 +157,14 @@ class HttpToolbox:
     def extract(self, schema: str, text: str) -> Any:
         return roles.extract(self.router, schema, text, seed=self.seed)
 
-    def rank(self, candidates: list[dict[str, Any]], evidence: Any) -> list[int]:
-        return roles.rank(self.router, candidates, evidence, seed=self.seed)
+    def rank(
+        self, candidates: list[dict[str, Any]], evidence: Any, preference: str | None = None
+    ) -> list[int]:
+        return roles.rank(
+            self.router,
+            candidates,
+            evidence,
+            preference=preference,
+            seed=self.seed,
+            prompt_name=self.rank_prompt,
+        )

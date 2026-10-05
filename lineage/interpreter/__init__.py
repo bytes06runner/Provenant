@@ -55,8 +55,11 @@ class Toolbox(Protocol):
     def extract(self, schema: str, text: str) -> Any:
         """Q-LLM: schema-validated JSON from untrusted text. No tools, no mandate."""
 
-    def rank(self, candidates: list[dict[str, Any]], evidence: Any) -> list[int]:
-        """Order candidate indices by fit with the evidence. Output is UNTRUSTED."""
+    def rank(
+        self, candidates: list[dict[str, Any]], evidence: Any, preference: str | None
+    ) -> list[int]:
+        """Order candidate indices by fit with the evidence and the shopper's signed selection
+        preference. Output is UNTRUSTED."""
 
 
 @dataclass(frozen=True)
@@ -268,7 +271,10 @@ class Interpreter:
             out = self._untrusted_from(data, args["text"], f"qllm:extract:{schema}")
         elif tool == "rank":
             cands = self._candidates(args["candidates"])
-            order = self.tools.rank([c.summary() for c in cands], args["evidence"].value)
+            pref = self.mandate.mandate.preference
+            order = self.tools.rank(
+                [c.summary() for c in cands], args["evidence"].value, pref.value if pref else None
+            )
             out = self._untrusted_from(order, args["evidence"], "qllm:rank")
         else:  # precheck
             out = self._precheck(self._manifest(args["manifest"]), args["sku"])
