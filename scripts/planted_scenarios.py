@@ -39,7 +39,10 @@ def load_state() -> dict[str, Any]:
     return json.loads(STATE.read_text()) if STATE.exists() else {}
 
 
-def save_state(state: dict[str, Any]) -> None:
+def save_entry(name: str, entry: dict[str, Any]) -> None:
+    """Re-read before writing so two concurrent phases never drop each other's scenarios."""
+    state = load_state()
+    state[name] = entry
     STATE.write_text(json.dumps(state, indent=2))
 
 
@@ -73,23 +76,27 @@ def create(rt: Runtime, cfg: dict[str, Any]) -> None:
         )
         p = s.run(vm, s.plan(vm, url))
         order = s.create_order(p)
-        state[name] = {
-            "session": s.session_id,
-            "order_id": order.order_id,
-            "merchant": order.merchant_id,
-            "chosen": p.candidate.summary(),
-            "approval_url": order.approval_url,
-        }
-        save_state(state)
+        save_entry(
+            name,
+            {
+                "session": s.session_id,
+                "order_id": order.order_id,
+                "merchant": order.merchant_id,
+                "chosen": p.candidate.summary(),
+                "approval_url": order.approval_url,
+            },
+        )
         print(
             f"{name}: {order.merchant_id} {p.candidate.summary()['sku']} "
             f"total {p.candidate.summary()['total']}\n  approve: {order.approval_url}"
         )
 
 
-def authorize(rt: Runtime) -> None:
+def authorize(rt: Runtime, only: set[str] | None) -> None:
     state = load_state()
     for name, st in state.items():
+        if only and name not in only:
+            continue
         a = authorize_recorded(
             recorder=rt.recorder,
             session_id=st["session"],
@@ -100,14 +107,16 @@ def authorize(rt: Runtime) -> None:
             clock=time.monotonic,
         )
         st["authorization"] = a
-        save_state(state)
+        save_entry(name, st)
         print(f"{name}: authorized {a['authorization_id']} {a['status']}")
 
 
-def resolve(rt: Runtime, cfg: dict[str, Any], k: int) -> int:
+def resolve(rt: Runtime, cfg: dict[str, Any], k: int, only: set[str] | None) -> int:
     state = load_state()
     rows = []
     for name, sc in cfg["scenarios"].items():
+        if only and name not in only:
+            continue
         st = state[name]
         session = st["session"]
         if sc["fulfill"] and "fulfillment" not in st:
@@ -119,7 +128,7 @@ def resolve(rt: Runtime, cfg: dict[str, Any], k: int) -> int:
                 paypal=rt.paypal,
                 force_wrong_variant=bool(sc.get("planted_wrong_variant")),
             )
-            save_state(state)
+            save_entry(name, st)
         photo = None
         if sc["photo"]:
             color = st["fulfillment"]["shipment"]["shipped_attributes"]["color"]
@@ -161,7 +170,7 @@ def resolve(rt: Runtime, cfg: dict[str, Any], k: int) -> int:
             }
         )
         st["result"] = rows[-1]
-        save_state(state)
+        save_entry(name, st)
         print(json.dumps(rows[-1], indent=2, default=str))
     print("\nSUMMARY")
     for row in rows:
@@ -181,15 +190,16 @@ def main() -> int:
     g.add_argument("--authorize", action="store_true")
     g.add_argument("--resolve", action="store_true")
     ap.add_argument("--k", type=int)
+    ap.add_argument("--only", nargs="+", help="scenario names (default: all)")
     args = ap.parse_args()
     rt = Runtime.load()
     cfg = load_yaml("eval/planted.yaml")
     if args.create:
         create(rt, cfg)
     elif args.authorize:
-        authorize(rt)
+        authorize(rt, set(args.only or []))
     else:
-        return resolve(rt, cfg, ReplaySettings.for_run(args.k).k)
+        return resolve(rt, cfg, ReplaySettings.for_run(args.k).k, set(args.only or []))
     return 0
 
 
