@@ -21,7 +21,7 @@ from typing import Any, Protocol
 from jsonschema import Draft202012Validator
 
 from lineage.dsl import SCHEMA_PATH, Plan, PlanError, validate_plan
-from llm.types import LLMRequest, LLMResponse, Message
+from llm.types import Image, LLMRequest, LLMResponse, Message
 
 PROMPTS = Path(__file__).resolve().parent / "prompts"
 
@@ -183,13 +183,18 @@ def make_plan(
     *,
     prompt_name: str = "planner_v2",
     max_repairs: int = 1,
+    role: str = "planner",
+    sample_index: int = 0,
 ) -> PlanResult:
-    """Ask the planner for a plan; if it is invalid, send the validator's error back once."""
+    """Ask the planner for a plan; if it is invalid, send the validator's error back once.
+
+    `role` is "planner" for the agent and "reference_policy" for Blackbox's do(A) replays;
+    `sample_index` keeps replay samples distinct."""
     user = json.dumps(mandate_context, indent=1)
     attempts: list[dict[str, Any]] = []
     for attempt in range(1 + max_repairs):
-        req = _request(router, "planner", prompt(prompt_name), user, "plan")
-        resp = router.call("planner", req, sample_index=attempt)
+        req = _request(router, role, prompt(prompt_name), user, "plan")
+        resp = router.call(role, req, sample_index=sample_index * (1 + max_repairs) + attempt)
         try:
             plan = validate_plan(parse_json(resp.text))
         except (ValueError, PlanError) as e:
@@ -267,3 +272,70 @@ def rank(
     if not isinstance(order, list):
         return []
     return [i for i in order if isinstance(i, int) and not isinstance(i, bool)]
+
+
+# ---- vision ------------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class DeliveryCheck:
+    """What the photo shows. UNTRUSTED user evidence until the user confirms it."""
+
+    primary_color: str
+    item_type: str
+    confidence: str
+    matches_shipment_record: bool
+    escalated: bool
+    models: list[str]
+
+
+def check_delivery(
+    router: Router,
+    image: Image,
+    *,
+    allowed_colors: list[str],
+    record_color: str | None,
+) -> DeliveryCheck | None:
+    """Flash-Lite first; escalate to the stronger vision model only on low confidence or when
+    the photo disagrees with the merchant's shipment record (protects its small daily quota)."""
+    context = json.dumps(
+        {"allowed_colors": allowed_colors, "merchant_says_it_shipped_color": record_color}
+    )
+    models: list[str] = []
+
+    def ask(role: str) -> dict[str, Any] | None:
+        req = _request(router, role, prompt("vision_delivery_v1"), context, "vision_delivery_v1")
+        req = LLMRequest(
+            messages=(req.messages[0], Message("user", context, (image,))),
+            temperature=req.temperature,
+            max_tokens=req.max_tokens,
+            json_schema=req.json_schema,
+            schema_name=req.schema_name,
+            structured=req.structured,
+        )
+        resp = router.call(role, req)
+        models.append(f"{resp.provider}/{resp.model}")
+        try:
+            data = parse_json(resp.text)
+        except ValueError:
+            return None
+        if list(Draft202012Validator(schema("vision_delivery_v1")).iter_errors(data)):
+            return None
+        return dict(data)
+
+    first = ask("vision")
+    disagrees = (
+        first is not None and record_color is not None and (first["primary_color"] != record_color)
+    )
+    escalate = first is None or first["confidence"] != "high" or disagrees
+    final = ask("vision_escalation") if escalate else first
+    if final is None:
+        return None
+    return DeliveryCheck(
+        primary_color=str(final["primary_color"]),
+        item_type=str(final["item_type"]),
+        confidence=str(final["confidence"]),
+        matches_shipment_record=bool(final["matches_shipment_record"]),
+        escalated=escalate,
+        models=models,
+    )

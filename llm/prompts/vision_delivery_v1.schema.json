@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["item_type", "primary_color", "matches_shipment_record", "confidence"],
+  "properties": {
+    "item_type": {"type": "string"},
+    "primary_color": {"type": "string"},
+    "matches_shipment_record": {"type": "boolean"},
+    "confidence": {"type": "string", "enum": ["low", "medium", "high"]}
+  }
+}

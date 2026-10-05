@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["heading", "findings", "holding", "remedy"],
+  "properties": {
+    "heading": {"type": "string"},
+    "findings": {"type": "array", "items": {"type": "string"}},
+    "holding": {"type": "string"},
+    "remedy": {"type": "string"}
+  }
+}
