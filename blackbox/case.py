@@ -197,21 +197,29 @@ def _percent(x: Fraction) -> str:
     return f"{float(x * 100):.1f}"
 
 
-# ---- the case ----------------------------------------------------------------------------
+@dataclass
+class Assessment:
+    original: VerifiedMandate
+    clarified: VerifiedMandate
+    merchant: VerifiedManifest
+    facts: Facts
+    attribution: Attribution | None
+    note: str
+    overpayment: Decimal | None
 
 
-def run_case(
-    deps: CaseDeps, session_id: str, complaint: Complaint, *, k: int, approve: bool
-) -> CaseResult:
+def assess(
+    deps: CaseDeps,
+    purchase: PurchaseRecord,
+    case: str,
+    complaint: Complaint,
+    record: Callable[[str, dict[str, Any]], None],
+    *,
+    k: int,
+) -> Assessment:
+    """Steps A and B: clarified intent, photo check, facts, replay and attribution. Reads no
+    PayPal state, so the evaluation harness runs it on purchases that never created an order."""
     rec = deps.recorder
-    purchase = load_purchase(rec, session_id)
-    case = file_complaint(rec, purchase, complaint)
-
-    def record(event_type: str, payload: dict[str, Any]) -> None:
-        rec.append(case, event_type, payload)
-
-    deps.record_into(record)  # LLM calls of this case land in the case's own chain
-
     original = verify_mandate(
         purchase.mandate_envelope,
         user_id=deps.user_id,
@@ -237,8 +245,6 @@ def run_case(
         delivery=delivery,
     )
     record("facts.established", facts.to_dict())
-    state = _paypal_state(deps, purchase)
-    record("paypal.state", state)
 
     manifests = _manifests(deps, purchase)
     merchant = manifests[purchase.merchant_id]
@@ -316,6 +322,32 @@ def run_case(
             )
         else:
             note = f"the purchase satisfies the clarified intent ({why}); no replay needed"
+    return Assessment(original, clarified, merchant, facts, attribution, note, overpayment)
+
+
+# ---- the case ----------------------------------------------------------------------------
+
+
+def run_case(
+    deps: CaseDeps, session_id: str, complaint: Complaint, *, k: int, approve: bool
+) -> CaseResult:
+    rec = deps.recorder
+    purchase = load_purchase(rec, session_id)
+    order_id = purchase.order_id
+    assert order_id is not None  # load_purchase requires the order by default
+    case = file_complaint(rec, purchase, complaint)
+
+    def record(event_type: str, payload: dict[str, Any]) -> None:
+        rec.append(case, event_type, payload)
+
+    deps.record_into(record)  # LLM calls of this case land in the case's own chain
+
+    a = assess(deps, purchase, case, complaint, record, k=k)
+    original, clarified, merchant, facts = a.original, a.clarified, a.merchant, a.facts
+    attribution, note, overpayment = a.attribution, a.note, a.overpayment
+    state = _paypal_state(deps, purchase)
+    record("paypal.state", state)
+
     result = _conclude(
         deps,
         case,
@@ -350,7 +382,7 @@ def run_case(
             case, max_rounds=deps.max_settle_rounds, sleep=deps.sleep
         )
         result.discrepancies = deps.poller.discrepancies(
-            case_id=case, order_id=purchase.order_id, app=purchase.merchant_id, caused=deps.caused()
+            case_id=case, order_id=order_id, app=purchase.merchant_id, caused=deps.caused()
         )
     record(
         "case.closed",
@@ -610,4 +642,4 @@ def _pack(
     )
 
 
-__all__ = ["CaseDeps", "CaseResult", "label", "rerender_case", "run_case"]
+__all__ = ["Assessment", "CaseDeps", "CaseResult", "assess", "label", "rerender_case", "run_case"]

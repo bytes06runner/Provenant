@@ -29,8 +29,8 @@ class PurchaseRecord:
     sku: str
     signed_attributes: dict[str, str]
     total: str
-    order_id: str
-    custom_id: str
+    order_id: str | None  # None for evaluation purchases that stop before a PayPal order
+    custom_id: str | None
     authorization_id: str | None
     capture_id: str | None
     shipment: dict[str, Any] | None
@@ -52,12 +52,19 @@ def _maybe(events: list[Event], event_type: str) -> Event | None:
     return found[-1] if found else None
 
 
-def load_purchase(recorder: FlightRecorder, session_id: str) -> PurchaseRecord:
+def load_purchase(
+    recorder: FlightRecorder, session_id: str, *, require_order: bool = True
+) -> PurchaseRecord:
     recorder.verify(session_id)  # never build a case on a tampered trace
     events = recorder.events(session_id)
     mandate = SignedEnvelope.from_dict(_one(events, "mandate.signed").payload["envelope"])
     proposed = _one(events, "plan.proposed").payload["candidate"]
-    order = _one(events, "paypal.order.created").payload
+    created = (
+        _one(events, "paypal.order.created")
+        if require_order
+        else _maybe(events, "paypal.order.created")
+    )
+    order = created.payload if created else None
     auth = _maybe(events, "paypal.authorization")
     capture = _maybe(events, "paypal.capture")
     shipment = _maybe(events, "fulfillment.shipped")
@@ -82,8 +89,8 @@ def load_purchase(recorder: FlightRecorder, session_id: str) -> PurchaseRecord:
         sku=proposed["sku"],
         signed_attributes=dict(proposed["attributes"]),
         total=proposed["total"],
-        order_id=order["order"]["id"],
-        custom_id=order["order"]["purchase_units"][0]["custom_id"],
+        order_id=order["order"]["id"] if order else None,
+        custom_id=order["order"]["purchase_units"][0]["custom_id"] if order else None,
         authorization_id=auth.payload["authorization_id"] if auth else None,
         capture_id=capture.payload["capture_id"] if capture else None,
         shipment=dict(shipment.payload) if shipment else None,
