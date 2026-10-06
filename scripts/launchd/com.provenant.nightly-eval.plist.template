@@ -7,7 +7,7 @@
   <array>
     <string>/bin/zsh</string>
     <string>-c</string>
-    <string>cd "__REPO__" &amp;&amp; /usr/bin/caffeinate -i .venv/bin/python -u scripts/nightly_eval.py &gt;&gt; var/nightly-eval.out 2&gt;&amp;1</string>
+    <string>cd "__REPO__" &amp;&amp; /usr/bin/caffeinate -i .venv/bin/python -u scripts/nightly_eval.py &gt;&gt; var/nightly-eval.out 2&gt;&amp;1; scripts/backup_local_state.sh &gt;&gt; var/backup.log 2&gt;&amp;1</string>
   </array>
   <!-- 00:10 UTC, written in local time by scripts/launchd/install.sh -->
   <key>StartCalendarInterval</key>
