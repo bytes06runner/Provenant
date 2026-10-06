@@ -713,3 +713,15 @@ Postgres 16 `provenant-staging-db` (free plan). Created and updated by `scripts/
 
 **Local state**: everything not in git is backed up to `~/Provenant-private-backup/` after each
 nightly run (`scripts/backup_local_state.sh`); the project moves to `~/Desktop/PayPal ai hack`.
+
+## 2026-10-06: Submission assets and documentation
+
+- `Submission/`: 15 gallery images (1800x1200, 3:2), the demo video (1:44, 1920x1080, recorded
+  from the running app with cursor, click ripples, zooms and captions), a 4-page project brief
+  PDF, Devpost story text, and the scripts that regenerate all of them.
+- Docs: `docs/threat-model.md` (15 threats, defenses with code locations, what Provenant does not
+  protect against), `docs/demo-script.md` (scene timings measured from the video), README
+  rewritten for judges (problem, solution, results with sandbox ids, PayPal endpoints, AI roles,
+  setup, limitations, tools).
+- Still open: the video must be uploaded to YouTube and the project submitted on Devpost by the
+  team; production database decision before the staging Postgres expires on 2026-11-05.
