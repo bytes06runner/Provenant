@@ -20,7 +20,6 @@ import logging
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime
 from typing import Any
 
 from llm.budget import BudgetTracker
@@ -127,7 +126,7 @@ class LLMRouter:
     def _warn_if_near_budget(self, role: str, target: Target) -> None:
         lim = self.budget.limits_for(target.model)
         spend = self.budget.spend(target.model)
-        day = datetime.now(UTC).strftime("%Y-%m-%d")
+        day = self.budget.day_start(target.model).strftime("%Y-%m-%dT%H")
         frac = self.config.warning_fraction
         for metric, used, limit in (
             ("requests_per_day", spend.requests_today, lim.requests_per_day),

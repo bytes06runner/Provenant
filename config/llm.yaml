@@ -31,13 +31,11 @@ budgets:
     "openai/gpt-oss-120b": {tokens_per_minute: 8000, requests_per_day: 1000, tokens_per_day: 150000}
     "openai/gpt-oss-20b": {tokens_per_minute: 8000, requests_per_day: 1000, tokens_per_day: 150000}
     "qwen/qwen3.8-27b": {tokens_per_minute: 8000, requests_per_day: 1000, tokens_per_day: 150000}
-    # Measured 2026-10-05 from Google's 429 QuotaFailure: free tier allows 20 requests per day
-    # per project per model (GenerateRequestsPerDayPerProjectPerModel-FreeTier). Token numbers
-    # are still our own caps. Use for low-volume roles only.
-    "gemini-3.8-flash": {tokens_per_minute: 250000, requests_per_day: 20, tokens_per_day: 500000}
-    # PROVISIONAL: Google publishes free-tier limits only in AI Studio. The router records the
-    # exact value from the first quota 429 (QuotaFailure.quotaValue) and adjusts in memory.
-    "gemini-3.5-flash-lite": {tokens_per_minute: 250000, requests_per_day: 1000, tokens_per_day: 2000000}
+    # Gemini free tier, from AI Studio's rate-limit page (2026-10-06): 3.8 Flash 5 RPM, 250K TPM,
+    # 20 RPD (also seen in a 429 QuotaFailure on 2026-10-05); 3.5 Flash-Lite 15 RPM, 250K TPM,
+    # 500 RPD. Daily quotas reset at midnight Pacific. tokens_per_day is our own cap.
+    "gemini-3.8-flash": {tokens_per_minute: 250000, requests_per_minute: 5, requests_per_day: 20, tokens_per_day: 500000, day_reset_tz: "America/Los_Angeles"}
+    "gemini-3.5-flash-lite": {tokens_per_minute: 250000, requests_per_minute: 15, requests_per_day: 500, tokens_per_day: 2000000, day_reset_tz: "America/Los_Angeles"}
 
 # Replay cache (Blackbox): which roles may reuse a recorded response when inputs are identical.
 #   always: reuse whenever the exact inputs were seen (deterministic roles, temperature 0)

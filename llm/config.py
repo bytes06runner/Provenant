@@ -61,6 +61,8 @@ def _limits(d: dict[str, Any]) -> Limits:
         tokens_per_minute=int(d["tokens_per_minute"]),
         requests_per_day=int(d["requests_per_day"]),
         tokens_per_day=int(d["tokens_per_day"]),
+        requests_per_minute=int(d["requests_per_minute"]) if d.get("requests_per_minute") else None,
+        day_reset_tz=str(d.get("day_reset_tz", "UTC")),
     )
 
 

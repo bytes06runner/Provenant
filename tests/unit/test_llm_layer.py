@@ -859,3 +859,49 @@ def test_call_defaults_from_config(yaml_file):
     assert cfg.call_defaults("planner") == {} and cfg.warning_fraction == Decimal("0.8")
     real = load_llm_config()
     assert real.call_defaults("planner")["max_tokens"] == 1200
+
+
+def test_requests_per_minute_and_pacific_quota_day():
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.pool import StaticPool
+
+    from llm.budget import BudgetTracker, Limits
+
+    t = [datetime(2026, 10, 6, 6, 59, 0, tzinfo=UTC)]  # 23:59 Pacific on Oct 5
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    lim = Limits(1000, 3, 10_000, requests_per_minute=2, day_reset_tz="America/Los_Angeles")
+    b = BudgetTracker(engine, {"g": lim}, lim, now=lambda: t[0])
+    b.record("gemini", "g", "planner", 10)
+    t[0] += timedelta(seconds=10)
+    b.record("gemini", "g", "planner", 10)
+    assert b.wait_seconds("g", 10) == pytest.approx(50.0)  # third request waits for the first
+    t[0] += timedelta(seconds=55)  # 07:00:05 UTC: a new Pacific day; the first call aged out
+    assert b.spend("g").requests_today == 0 and b.spend("g").requests_last_minute == 1
+    assert b.wait_seconds("g", 10) == 0.0
+    assert b.day_start("g") == datetime(2026, 10, 6, 7, 0, tzinfo=UTC)
+    utc = BudgetTracker(engine, {}, Limits(1000, 3, 10_000), now=lambda: t[0])
+    assert utc.day_start("g") == datetime(2026, 10, 6, 0, 0, tzinfo=UTC)
+    assert utc.spend("g").requests_today == 2  # the UTC day still counts both calls
+
+
+def test_rpm_and_token_windows_combine():
+    from datetime import UTC, datetime, timedelta
+
+    from sqlalchemy import create_engine
+    from sqlalchemy.pool import StaticPool
+
+    from llm.budget import BudgetTracker, Limits
+
+    t = [datetime(2026, 10, 6, 12, 0, tzinfo=UTC)]
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    lim = Limits(100, 50, 10_000, requests_per_minute=1)
+    b = BudgetTracker(engine, {"g": lim}, lim, now=lambda: t[0])
+    b.record("gemini", "g", "planner", 90)
+    t[0] += timedelta(seconds=20)
+    assert b.wait_seconds("g", 50) == pytest.approx(40.0)  # both windows free at the same time
