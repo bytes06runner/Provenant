@@ -39,6 +39,7 @@ from sqlalchemy import (
     UniqueConstraint,
     insert,
     select,
+    text,
 )
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
@@ -174,23 +175,30 @@ class FlightRecorder:
     ) -> Event:
         """Append one event at the head of the session's chain.
 
-        Two writers racing on the same session both compute seq = head + 1; the primary key lets
-        exactly one win, and the loser retries on top of the new head.
+        On Postgres, a per-session advisory lock held for the transaction serializes writers to
+        one session, so the head read and the insert see the same chain. Elsewhere (SQLite) two
+        writers may both compute seq = head + 1; the primary key lets exactly one win, and the
+        loser retries on top of the new head.
         """
         if not session_id or not event_type:
             raise RecorderError("session_id and event_type are required")
         payload_json = canonicalize(payload)
         payload_hash = _sha256(payload_json)
         for _ in range(self.max_append_attempts):
-            head = self.head(session_id)
-            seq = 0 if head is None else head.seq + 1
-            prev = genesis(session_id) if head is None else head.event_hash
             recorded_at = _aware(now or datetime.now(UTC))
-            event_hash = compute_event_hash(
-                session_id, seq, event_type, payload_hash, recorded_at, prev
-            )
             try:
                 with self.engine.begin() as conn:
+                    if conn.dialect.name == "postgresql":  # pragma: no cover  (tests/integration)
+                        conn.execute(
+                            text("SELECT pg_advisory_xact_lock(hashtextextended(:s, 0))"),
+                            {"s": session_id},
+                        )
+                    head = self._head_in(conn, session_id)
+                    seq = 0 if head is None else head[0] + 1
+                    prev = genesis(session_id) if head is None else head[1]
+                    event_hash = compute_event_hash(
+                        session_id, seq, event_type, payload_hash, recorded_at, prev
+                    )
                     conn.execute(
                         insert(recorder_events).values(
                             session_id=session_id,
@@ -239,6 +247,16 @@ class FlightRecorder:
             event_hash=row["event_hash"],
             recorded_at=_aware(row["recorded_at"]),
         )
+
+    def _head_in(self, conn: Any, session_id: str) -> tuple[int, str] | None:
+        """(seq, event_hash) of the session's head, read inside the append transaction."""
+        row = conn.execute(
+            select(recorder_events.c.seq, recorder_events.c.event_hash)
+            .where(recorder_events.c.session_id == session_id)
+            .order_by(recorder_events.c.seq.desc())
+            .limit(1)
+        ).first()
+        return None if row is None else (int(row[0]), str(row[1]))
 
     def head(self, session_id: str) -> Event | None:
         q = (

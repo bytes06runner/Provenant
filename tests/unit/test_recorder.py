@@ -275,15 +275,15 @@ def test_concurrent_writers_never_fork_the_chain(rec):
 def test_lost_race_retries_on_new_head(rec, monkeypatch):
     """Simulate losing the race: the first head read is stale, so the insert collides."""
     fill(rec, n=2)
-    real_head = rec.head
+    real_head = rec._head_in
     stale = rec.events("s1")[0]
     calls = {"n": 0}
 
-    def flaky_head(session_id):
+    def flaky_head(conn, session_id):
         calls["n"] += 1
-        return stale if calls["n"] == 1 else real_head(session_id)
+        return (stale.seq, stale.event_hash) if calls["n"] == 1 else real_head(conn, session_id)
 
-    monkeypatch.setattr(rec, "head", flaky_head)
+    monkeypatch.setattr(rec, "_head_in", flaky_head)
     e = rec.append("s1", "e", {"after": "race"}, now=T0 + timedelta(minutes=1))
     assert e.seq == 2 and calls["n"] == 2
     rec.verify("s1")
@@ -293,7 +293,11 @@ def test_gives_up_after_repeated_collisions(rec, monkeypatch):
     fill(rec, n=1)
     stale = rec.events("s1")[0]
     rec.max_append_attempts = 3
-    monkeypatch.setattr(rec, "head", lambda _sid: None if stale.seq == 0 else stale)
+    monkeypatch.setattr(
+        rec,
+        "_head_in",
+        lambda _conn, _sid: None if stale.seq == 0 else (stale.seq, stale.event_hash),
+    )
     with pytest.raises(RecorderError, match="could not append"):
         rec.append("s1", "e", {})
 
