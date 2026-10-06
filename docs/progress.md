@@ -672,3 +672,44 @@ merchant, pure agent and mixed (U+M); planted preconditions are checked before t
   real sandbox orders `7NA8946895215061G` and `6DJ25837GV184773G` at Kestrel.
 - Next: the ASR and utility evaluation (baseline vs Provenant on the same tasks and attacks),
   then Playwright screenshots.
+
+## 2026-10-06: Staging on Render
+
+Live: buyer app `https://provenant-web-staging.onrender.com`, API
+`https://provenant-api-staging.onrender.com`, simulator `https://provenant-merchants-staging.onrender.com`,
+Postgres 16 `provenant-staging-db` (free plan). Created and updated by `scripts/render_deploy.py`
+(`docs/deploy.md`); all three services went live on the first build.
+
+**Verified on staging**
+- Alembic: the initial migration (9 tables) applies; the API runs `alembic upgrade head` at start.
+- Postgres store tests (`pytest -m postgres`): recorder (with 20 concurrent appends), ledger
+  idempotency, nonces, vault, budgets, webhook store: 4 of 4 pass.
+- A full purchase through the deployed API: mandate drafted from Render, the agent picked the
+  cheapest compliant item (Northwind NOR-001, 79.69), both live hijacks blocked, provenance graph
+  served from the Postgres recorder, PayPal order `82T986074S4769918` with the chain-head
+  custom_id, and a browser client token bound to the staging domain (localhost could never test
+  this). The staging buyer app renders the official PayPal button with no console errors.
+- Public webhooks: one per PayPal app (operator and four merchants). A `simulate-event`
+  delivery reached `/api/webhooks/paypal/kestrel`, verified with PayPal, and was stored once in
+  Postgres; the API's background poller picks up the hinted resource.
+
+**What broke, and the fixes**
+1. Recorder appends livelocked on Postgres: four concurrent writers to one session gave up after
+   5 retries (optimistic head+1 over a ~200 ms link). Fixed with a per-session advisory lock held
+   for the append transaction; SQLite keeps the retry path.
+2. A database created through Render's API has an empty IP allow list, so migrations from this
+   machine were refused (SSL closed). Allowed this machine's /32 only; services use the internal URL.
+3. Free Postgres expires on 2026-11-05, before the Nov 12 deadline. Production needs a paid
+   database or a free one created after Oct 13.
+4. Free services sleep after 15 idle minutes; the first request takes up to a minute (PayPal
+   retries webhooks; reconciliation catches up on wake).
+
+**Evaluation harnesses**
+- Attack success and utility (`eval/security.py`, `scripts/daily_eval.py`): 170 tasks (120 attack,
+  50 benign), both agents per task, success judged on what PayPal holds or would hold, and
+  whether each agent actually saw the poisoned page. First live task: 6 Flash-Lite calls.
+- Budget: Flash-Lite 15 RPM / 500 RPD and 3.8 Flash 5 RPM / 20 RPD from AI Studio, now enforced,
+  with Gemini's quota day counted in Pacific time. Plan in `docs/eval-plan.md`.
+
+**Local state**: everything not in git is backed up to `~/Provenant-private-backup/` after each
+nightly run (`scripts/backup_local_state.sh`); the project moves to `~/Desktop/PayPal ai hack`.
