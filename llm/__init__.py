@@ -60,6 +60,7 @@ def build_router(engine: Engine, *, record: Recorder | None = None) -> LLMRouter
         ReplayCache(engine),
         record=record,
         settings=RouterSettings(
+            max_wait_seconds=float(http.get("max_wait_seconds", 20)),
             max_retries=int(http["max_retries"]),
             backoff_base_seconds=float(http["backoff_base_seconds"]),
             default_cooldown_seconds=float(http["default_cooldown_seconds"]),

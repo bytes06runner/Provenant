@@ -18,6 +18,9 @@ http:
   max_retries: 2            # on 5xx and transport errors, before falling back
   backoff_base_seconds: 1.0
   default_cooldown_seconds: 60   # after a 429 without a retry hint
+  # Wait this long for a full per-minute window (tokens or requests) before falling back. A
+  # request-count window (Flash-Lite: 15 per minute) can need up to 60 s to free a slot.
+  max_wait_seconds: 65
 
 # Per-model limits. tokens_per_minute and requests_per_day are read from Groq's
 # x-ratelimit-* headers (2026-10-05). tokens_per_day is our own cap, set below the provider's
