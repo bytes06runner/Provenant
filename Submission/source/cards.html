@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Provenant cards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4f1ea; --surface: #eae4d8; --surface-2: #e1d9c9; --line: #d3c9b5; --text: #1c1a17;
+    --muted: #5f584d; --accent: #b55d34; --laurel: #5f6e4c; --slate: #5d6670; --crimson: #9b2f3a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #222; font-family: Inter, system-ui, sans-serif; color: var(--text); }
+  .card { width: var(--w, 1800px); height: var(--h, 1200px); background: var(--bg); position: relative; overflow: hidden;
+          padding: 110px 130px; display: flex; flex-direction: column; margin-bottom: 40px; color: var(--text); }
+  .card.dark { --bg: #1a1816; --surface: #24211e; --surface-2: #2d2925; --line: #3b3631; --text: #f1ece2; --muted: #b3aa9b;
+               --accent: #e08a62; --laurel: #a9b891; --slate: #a4adb8; --crimson: #e5868f; }
+  .display { font-family: "Instrument Serif", Georgia, serif; font-style: italic; font-weight: 400; letter-spacing: -0.01em; }
+  .dark .display { color: #b9a6d3; }
+  .mono { font-family: "JetBrains Mono", Menlo, monospace; }
+  .kicker { font-size: 22px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); }
+  .muted { color: var(--muted); }
+  .chip { display: inline-block; border: 2px solid; border-radius: 999px; padding: 6px 18px; font-size: 20px; font-weight: 600;
+          letter-spacing: 0.06em; text-transform: uppercase; margin-right: 14px; }
+  .user { color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .sealed { color: var(--laurel); background: color-mix(in srgb, var(--laurel) 10%, transparent); }
+  .derived { color: var(--slate); background: color-mix(in srgb, var(--slate) 10%, transparent); }
+  .untrusted { color: var(--crimson); background: color-mix(in srgb, var(--crimson) 10%, transparent); }
+  .meander { height: 18px; margin: 34px 0; color: var(--line);
+             background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='18'%3E%3Cpath d='M0 17 H36 M28 17 V1 H8 V12 H21 V6 H14' fill='none' stroke='%23d3c9b5' stroke-width='1.8'/%3E%3C/svg%3E") repeat-x; }
+  .dark .meander { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='18'%3E%3Cpath d='M0 17 H36 M28 17 V1 H8 V12 H21 V6 H14' fill='none' stroke='%233b3631' stroke-width='1.8'/%3E%3C/svg%3E") repeat-x; }
+  .seal { width: 92px; height: 92px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 34px; }
+  .panel { border: 2px solid var(--line); border-radius: 22px; padding: 34px 36px; background: color-mix(in srgb, var(--surface) 55%, transparent); }
+  .num-big { font-family: "Instrument Serif", serif; font-size: 96px; line-height: 1; color: var(--accent); }
+  .foot { position: absolute; left: 130px; right: 130px; bottom: 70px; display: flex; justify-content: space-between;
+          font-size: 22px; color: var(--muted); }
+  /* video size */
+  .video { --w: 1920px; --h: 1080px; padding: 100px 150px; }
+</style>
+</head>
+<body>
+
+<!-- 1. Title -->
+<section class="card" id="title">
+  <div class="kicker">PayPal AI Hackathon 2026 · Fiat iustitia</div>
+  <h1 class="display" style="font-size:190px; line-height:0.95; margin-top:60px;">Provenant</h1>
+  <p class="display" style="font-size:76px; line-height:1.08; margin-top:26px; max-width:1300px;">A tribunal for every purchase your agent makes.</p>
+  <p class="muted" style="font-size:32px; line-height:1.45; margin-top:44px; max-width:1250px;">
+    Agent checkout that prompt injection cannot hijack, and when a purchase still goes wrong,
+    a ruling on who caused it, with the money moved on PayPal rails.
+  </p>
+  <div style="margin-top:56px;">
+    <span class="chip user">User</span><span class="chip sealed">Sealed</span><span class="chip derived">Derived</span><span class="chip untrusted">Untrusted</span>
+  </div>
+  <div class="grid3" style="margin-top:70px; border-top:2px solid var(--line); padding-top:44px;">
+    <div><div class="display" style="font-size:54px; color:var(--accent);">I</div><p style="font-size:30px; font-weight:600; margin-top:6px;">Lineage</p><p class="muted" style="font-size:23px; line-height:1.45; margin-top:8px;">Every field of the PayPal order traces to your signed mandate or the merchant's signed catalog. Page text cannot bind it.</p></div>
+    <div><div class="display" style="font-size:54px; color:var(--accent);">II</div><p style="font-size:30px; font-weight:600; margin-top:6px;">Blackbox</p><p class="muted" style="font-size:23px; line-height:1.45; margin-top:8px;">A wrong purchase is replayed with each party corrected. Fault is weighed with exact Shapley values.</p></div>
+    <div><div class="display" style="font-size:54px; color:var(--accent);">III</div><p style="font-size:30px; font-weight:600; margin-top:6px;">Remedy</p><p class="muted" style="font-size:23px; line-height:1.45; margin-top:8px;">The ruling moves money on PayPal: void, merchant refund, or a payout from the agent's liability pool.</p></div>
+  </div>
+  <div class="foot"><span>Lineage · Blackbox · Flight Recorder</span><span class="mono">github.com/bytes06runner/Provenant</span></div>
+  <svg class="seal" viewBox="0 0 44 44" style="position:absolute; right:150px; top:120px; width:210px; height:210px;">
+    <path d="M22 2c3 0 4 3 7 3.5s5.5-1.5 7.5 1 0 5.5 1.5 8 4.5 3.5 4 6.5-3.5 4-4 7 1.5 5.5-1 7.5-5.5 0-8 1.5-3.5 4.5-6.5 4-4-3.5-7-4-5.5 1.5-7.5-1 0-5.5-1.5-8S2 25 2 22s3.5-4 4-7-1.5-5.5 1-7.5 5.5 0 8-1.5S19 2 22 2z" fill="#b55d34" opacity="0.92"/>
+    <circle cx="22" cy="22" r="11" fill="none" stroke="#f4f1ea" stroke-opacity="0.6" stroke-width="1.2"/>
+    <text x="22" y="26.5" text-anchor="middle" font-size="12" fill="#f4f1ea" font-family="Instrument Serif" font-style="italic">P</text>
+  </svg>
+</section>
+
+<!-- 2. Problem -->
+<section class="card dark" id="problem">
+  <div class="kicker">The problem</div>
+  <div style="margin-top:70px; display:grid; gap:60px;">
+    <div>
+      <p class="display" style="font-size:88px; line-height:1.05;">Agents get hijacked by text on web pages.</p>
+      <p class="muted" style="font-size:30px; margin-top:20px; max-width:1300px; line-height:1.45;">A review, a hidden banner or a "policy notice" can tell a shopping agent whom to pay, what to buy and where to ship. Prompt injection succeeds against a large share of agents in current benchmarks.</p>
+    </div>
+    <div>
+      <p class="display" style="font-size:88px; line-height:1.05;">When an agent buys wrong, nobody knows who pays.</p>
+      <p class="muted" style="font-size:30px; margin-top:20px; max-width:1300px; line-height:1.45;">The user's wording, the merchant's listing and the agent's choice all contributed. No rule assigns the fault, so the money stays where it fell.</p>
+    </div>
+  </div>
+  <div class="foot"><span>Provenant solves both, on PayPal rails.</span><span class="mono">01 / problem</span></div>
+</section>
+
+<!-- 3. Architecture -->
+<section class="card" id="architecture">
+  <div class="kicker">How it works</div>
+  <h2 class="display" style="font-size:80px; margin-top:22px;">Prevent, record, rule, remedy.</h2>
+  <svg viewBox="0 0 1540 760" style="margin-top:40px; width:1540px; height:760px;" font-family="Inter" font-size="22">
+    <defs>
+      <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="#5f584d"/></marker>
+      <marker id="r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0 L10 5 L0 10z" fill="#9b2f3a"/></marker>
+    </defs>
+    <style>
+      .bx { fill: #eae4d8; stroke: #d3c9b5; stroke-width: 2; rx: 16; }
+      .t { fill: #1c1a17; font-weight: 600; } .s { fill: #5f584d; font-size: 18px; }
+      .ln { stroke: #5f584d; stroke-width: 2.2; fill: none; }
+    </style>
+    <!-- Lineage row -->
+    <text x="0" y="24" class="s" style="letter-spacing:3px">LINEAGE · PREVENT</text>
+    <rect class="bx" x="0" y="44" width="250" height="120"/><text class="t" x="22" y="90">Your request</text><text class="s" x="22" y="122">confirmed and signed:</text><text class="s" x="22" y="146" fill="#b55d34">mandate (User)</text>
+    <rect class="bx" x="320" y="44" width="270" height="120"/><text class="t" x="342" y="90">Planner</text><text class="s" x="342" y="122">sees only the mandate,</text><text class="s" x="342" y="146">writes a plan (JSON DSL)</text>
+    <rect class="bx" x="660" y="44" width="300" height="120"/><text class="t" x="682" y="90">Interpreter + labels</text><text class="s" x="682" y="122">every value carries</text><text class="s" x="682" y="146">its source and label</text>
+    <rect class="bx" x="1030" y="44" width="230" height="120"/><text class="t" x="1052" y="90">Field contracts</text><text class="s" x="1052" y="122">payee, item, price,</text><text class="s" x="1052" y="146">total, address</text>
+    <rect class="bx" x="1320" y="44" width="220" height="120" style="fill:#e8dcc4"/><text class="t" x="1342" y="90">PayPal order</text><text class="s" x="1342" y="122">custom_id =</text><text class="s" x="1342" y="146">trace hash</text>
+    <path class="ln" d="M250 104 H316" marker-end="url(#a)"/><path class="ln" d="M590 104 H656" marker-end="url(#a)"/><path class="ln" d="M960 104 H1026" marker-end="url(#a)"/><path class="ln" d="M1260 104 H1316" marker-end="url(#a)"/>
+    <!-- merchant inputs -->
+    <rect class="bx" x="560" y="230" width="230" height="96"/><text class="t" x="582" y="270">Signed manifest</text><text class="s" x="582" y="300" fill="#5f6e4c">Sealed: price, payee</text>
+    <rect class="bx" x="830" y="230" width="290" height="96"/><text class="t" x="852" y="270">Pages and reviews</text><text class="s" x="852" y="300" fill="#9b2f3a">Untrusted, via Q-LLM</text>
+    <path class="ln" d="M675 230 V168" marker-end="url(#a)"/><path class="ln" d="M975 230 V168" marker-end="url(#a)"/>
+    <text class="s" x="1135" y="268" fill="#9b2f3a">cannot bind payee, item,</text><text class="s" x="1135" y="292" fill="#9b2f3a">price, quantity or address</text>
+    <!-- recorder spine -->
+    <rect x="0" y="372" width="1540" height="66" rx="16" style="fill:#1c1a17"/>
+    <text x="28" y="414" fill="#f4f1ea" font-weight="600">Flight Recorder</text>
+    <text x="250" y="414" fill="#d3c9b5" font-size="20">append-only, hash-chained: mandate, manifests, pages, every model call, plan, labels, contracts, PayPal calls</text>
+    <!-- Blackbox row -->
+    <text x="0" y="494" class="s" style="letter-spacing:3px">BLACKBOX · RULE AND REMEDY</text>
+    <rect class="bx" x="0" y="514" width="250" height="140"/><text class="t" x="22" y="560">Complaint</text><text class="s" x="22" y="592">clarified intent,</text><text class="s" x="22" y="616">photo of what arrived</text>
+    <rect class="bx" x="320" y="514" width="270" height="140"/><text class="t" x="342" y="560">Facts</text><text class="s" x="342" y="592">wrong item? false</text><text class="s" x="342" y="616">signed claim? (provable)</text>
+    <rect class="bx" x="660" y="514" width="300" height="140"/><text class="t" x="682" y="560">Replay, 8 scenarios</text><text class="s" x="682" y="592">do(user), do(merchant),</text><text class="s" x="682" y="616">do(agent), k samples each</text>
+    <rect class="bx" x="1030" y="514" width="230" height="140"/><text class="t" x="1052" y="560">Fault shares</text><text class="s" x="1052" y="592">exact Shapley,</text><text class="s" x="1052" y="616">Jeffreys intervals</text>
+    <rect class="bx" x="1320" y="514" width="220" height="140" style="fill:#e8dcc4"/><text class="t" x="1342" y="560">PayPal remedy</text><text class="s" x="1342" y="592">void · refund ·</text><text class="s" x="1342" y="616">payout · dispute</text>
+    <path class="ln" d="M250 584 H316" marker-end="url(#a)"/><path class="ln" d="M590 584 H656" marker-end="url(#a)"/><path class="ln" d="M960 584 H1026" marker-end="url(#a)"/><path class="ln" d="M1260 584 H1316" marker-end="url(#a)"/>
+    <path class="ln" d="M1430 164 V368" stroke-dasharray="6 6" marker-end="url(#a)"/>
+    <text class="s" x="0" y="716">Every money movement needs one human click; PayPal state is read back by GET and reconciled until final; webhooks are verified and only trigger a re-read.</text>
+  </svg>
+</section>
+
+<!-- 4. Results -->
+<section class="card dark" id="results">
+  <div class="kicker">On the PayPal sandbox, with real models</div>
+  <h2 class="display" style="font-size:80px; margin-top:22px;">What actually happened.</h2>
+  <div class="grid3" style="margin-top:56px;">
+    <div class="panel"><div class="num-big">14 / 14</div><p style="font-size:28px; margin-top:16px;">live hijack attempts blocked</p><p class="muted" style="font-size:22px; margin-top:10px; line-height:1.4;">Injected payees from page text and the attacker's own signed payee. The order builder refused every one.</p></div>
+    <div class="panel"><div class="num-big">3 / 3</div><p style="font-size:28px; margin-top:16px;">planted faults ruled correctly</p><p class="muted" style="font-size:22px; margin-top:10px; line-height:1.4;">User, merchant and agent faults, each with the matching PayPal action: void, refund, payout.</p></div>
+    <div class="panel"><div class="num-big">50 / 50</div><p style="font-size:28px; margin-top:16px;">a real shared-fault case</p><p class="muted" style="font-size:22px; margin-top:10px; line-height:1.4;">False "waterproof" claim plus an unstated need: refund of 45.26 from the merchant, the rest explained.</p></div>
+  </div>
+  <div class="panel" style="margin-top:34px;">
+    <p class="mono" style="font-size:22px; line-height:1.9;">
+      refund <b>6VC997542C814874E</b> 160.88 · void <b>0XU54803RE449331J</b> · payout <b>ASF3PFT6573V2</b> 10.83 · refund <b>3AA89058PW941291F</b> 45.26
+    </p>
+    <p class="muted" style="font-size:22px; margin-top:8px;">Every movement reconciled by GET until final. 573 tests, 100% coverage of the security core. Live on Render with Postgres and verified webhooks.</p>
+  </div>
+  <div class="foot"><span>Baseline on PayPal's Agent Toolkit, same model: attack and utility evaluation running daily</span><span class="mono">results</span></div>
+</section>
+
+<!-- 5. Close -->
+<section class="card" id="close">
+  <div class="kicker">Provenant</div>
+  <h2 class="display" style="font-size:120px; line-height:1; margin-top:40px; max-width:1400px;">Trust the purchase. Know who pays when it goes wrong.</h2>
+  <div class="meander"></div>
+  <p class="mono" style="font-size:30px; line-height:1.9;">github.com/bytes06runner/Provenant<br>provenant-web-staging.onrender.com</p>
+  <div class="foot"><span>Built for the PayPal AI Hackathon 2026 · PayPal Orders, Payments, Payouts, Disputes, Webhooks, Agent Toolkit</span><span></span></div>
+</section>
+
+</body>
+</html>

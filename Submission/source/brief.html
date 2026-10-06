@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Provenant: project brief</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 16mm 16mm 18mm 16mm; }
+  :root { --text: #1c1a17; --muted: #5f584d; --line: #d3c9b5; --surface: #eae4d8; --accent: #b55d34; --laurel: #5f6e4c; --crimson: #9b2f3a; }
+  * { box-sizing: border-box; }
+  body { font: 10.2pt/1.5 Inter, system-ui, sans-serif; color: var(--text); margin: 0; }
+  h1, h2, .display { font-family: "Instrument Serif", Georgia, serif; font-style: italic; font-weight: 400; }
+  h1 { font-size: 40pt; line-height: 1; margin: 0; }
+  h2 { font-size: 19pt; margin: 14pt 0 6pt; break-after: avoid; border-bottom: 1px solid var(--line); padding-bottom: 3pt; }
+  h3 { font-size: 10.5pt; margin: 10pt 0 3pt; }
+  p { margin: 0 0 6pt; }
+  .kicker { font-size: 8pt; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
+  .lede { font-size: 13pt; line-height: 1.35; margin: 8pt 0 10pt; }
+  .muted { color: var(--muted); }
+  .mono { font-family: "JetBrains Mono", Menlo, monospace; font-size: 8.6pt; }
+  tr, .box { break-inside: avoid; }
+  table { width: 100%; border-collapse: collapse; margin: 4pt 0 8pt; font-size: 9pt; }
+  th, td { text-align: left; vertical-align: top; padding: 4pt 6pt; border-bottom: 1px solid var(--line); }
+  th { background: var(--surface); font-weight: 600; }
+  .chip { display: inline-block; border: 1px solid; border-radius: 99px; padding: 0 6pt; font-size: 7.5pt; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+  .u { color: var(--accent); } .s { color: var(--laurel); } .d { color: #5d6670; } .x { color: var(--crimson); }
+  .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10pt; margin: 6pt 0; }
+  .box { border: 1px solid var(--line); border-radius: 8pt; padding: 8pt 10pt; background: #f8f6f0; }
+  .big { font-family: "Instrument Serif", serif; font-size: 26pt; color: var(--accent); line-height: 1; }
+  img.fig { width: 88%; display: block; margin-left: auto; margin-right: auto; border: 1px solid var(--line); border-radius: 6pt; margin: 4pt 0; }
+  ul { margin: 0 0 6pt 14pt; padding: 0; } li { margin: 0 0 2pt; }
+  .page-break { break-before: page; }
+  footer { position: fixed; bottom: -10mm; left: 0; right: 0; font-size: 7.5pt; color: var(--muted); display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+
+<div class="kicker">Project brief · PayPal AI Hackathon 2026</div>
+<h1>Provenant</h1>
+<p class="lede display">A tribunal for every purchase your agent makes.</p>
+<p>Provenant is a trust layer for AI agents that spend money. It makes agent checkout impossible to hijack through prompt injection, and when a purchase still goes wrong, it works out who caused it and moves the money accordingly on PayPal rails.</p>
+
+<h2>The problem</h2>
+<p><b>Agents get hijacked by text on web pages.</b> A review, a hidden banner or a "policy notice" can tell a shopping agent whom to pay, what to buy, how many and where to ship. Indirect prompt injection succeeds against a large share of agents in current benchmarks, and a conventional agent fills the payment fields from whatever it read.</p>
+<p><b>When an agent buys wrong, nobody knows who pays.</b> The user's wording, the merchant's listing and the agent's choice all contributed. No rule assigns the fault among consumer, AI provider and merchant, so the money stays where it fell.</p>
+
+<h2>The solution</h2>
+<div class="grid">
+  <div class="box"><h3>I. Lineage (prevent)</h3><p>Every field of the PayPal order carries provenance. The user's request becomes a mandate they review and <b>sign</b> (Ed25519 over RFC 8785 JSON). Merchants publish <b>signed</b> catalogs. Values are labeled <span class="chip u">User</span> <span class="chip s">Sealed</span> <span class="chip d">Derived</span> <span class="chip x">Untrusted</span>; field contracts allow payee, item and price only from the merchant's seal, quantity and address only from the user, and the total only derived from those. Page text cannot bind any of them.</p></div>
+  <div class="box"><h3>II. Blackbox (rule)</h3><p>A complaint opens a case. Facts come first: a wrong item shipped, or a <b>signed</b> claim that was false, is provable from the record. If the decision was wrong, the purchase is replayed from recorded inputs with each party corrected (8 scenarios, k samples each), and fault is split with exact Shapley values and Jeffreys intervals. Wide intervals go to a human.</p></div>
+  <div class="box"><h3>III. Remedy (pay)</h3><p>The ruling moves money on PayPal: void an uncaptured authorization, refund the merchant's share within its signed policy, pay the agent's share from a liability pool via Payouts, or prepare a dispute evidence pack. Every movement needs one operator click and is reconciled by GET until final.</p></div>
+</div>
+<p>The <b>Flight Recorder</b> is the spine: an append-only, hash-chained log of the mandate, manifests, page snapshots, every model call, the plan, every label and contract result, and every PayPal call. The order's <span class="mono">custom_id</span> is the hash of the decision trace, binding the money to the evidence.</p>
+<img class="fig" src="../gallery/03-how-it-works.png" alt="How Provenant works">
+
+<h2>How PayPal is used</h2>
+<table>
+  <tr><th>Step</th><th>PayPal API</th><th>Detail</th></tr>
+  <tr><td>Checkout</td><td class="mono">POST /v2/checkout/orders</td><td>intent AUTHORIZE, merchant's own credentials, payee and item breakdown only from contract-checked values, <span class="mono">custom_id</span> = trace hash, unique <span class="mono">invoice_id</span>, <span class="mono">PayPal-Request-Id</span> on every POST.</td></tr>
+  <tr><td>Approval</td><td>JS SDK v6 (official button)</td><td>Browser client token bound to the site's domain; server authorizes after <span class="mono">onApprove</span>.</td></tr>
+  <tr><td>Authorize, capture, track</td><td class="mono">/orders/{id}/authorize · /authorizations/{id}/capture · /orders/{id}/track</td><td>Capture on shipment, tracking added; the authorization keeps the trace hash.</td></tr>
+  <tr><td>Remedies</td><td class="mono">/authorizations/{id}/void · /captures/{id}/refund · /v1/payments/payouts</td><td>Idempotent through our own request ledger; every result read back by GET and reconciled until final.</td></tr>
+  <tr><td>Disputes</td><td>Disputes API</td><td>Full lifecycle proven in the sandbox (list, evidence upload, settle); the evidence pack PDF is generated per case.</td></tr>
+  <tr><td>Webhooks</td><td class="mono">/v1/notifications/webhooks · verify-webhook-signature</td><td>One webhook per app; every delivery verified with PayPal, stored once, and used only to trigger a re-read (GET stays the source of truth).</td></tr>
+  <tr><td>Baseline</td><td>PayPal Agent Toolkit (Python)</td><td>The "before" picture: a conventional agent calling the toolkit's <span class="mono">create_order</span>.</td></tr>
+</table>
+
+<h2>How AI is used</h2>
+<table>
+  <tr><th>Role</th><th>Model (free tier)</th><th>What it may and may not do</th></tr>
+  <tr><td>Mandate drafting</td><td>Groq gpt-oss-120b</td><td>Proposes fields from the user's own words; the user confirms and signs.</td></tr>
+  <tr><td>Planner</td><td>Gemini Flash-Lite</td><td>Sees only the signed mandate; writes a small JSON plan. Never sees web content.</td></tr>
+  <tr><td>Quarantined extractor and ranker</td><td>Groq Qwen</td><td>Turns page text into schema-checked JSON; no tools; output is always Untrusted.</td></tr>
+  <tr><td>Vision check</td><td>Gemini Flash-Lite, escalating to Gemini Flash</td><td>Reads the photo of what arrived; Untrusted evidence that can only corroborate.</td></tr>
+  <tr><td>Reference policy (replays)</td><td>Groq gpt-oss-120b</td><td>A stricter, different-model agent used as the correction for "the agent".</td></tr>
+  <tr><td>Narrator</td><td>Gemini Flash-Lite</td><td>Writes the ruling from computed numbers only; any number not in the result is rejected.</td></tr>
+</table>
+<p class="muted">Models never decide whether a payment is allowed and never compute fault shares. Labels, contracts, signatures, attribution and remedy routing are deterministic code with 100% test coverage.</p>
+
+<h2>Results on the PayPal sandbox, with real models</h2>
+<div class="grid">
+  <div class="box"><div class="big">14 / 14</div><p>live hijack attempts blocked (an injected payee from page text, and the attacker's own validly signed payee); the order builder refused every one.</p></div>
+  <div class="box"><div class="big">3 / 3</div><p>planted faults (user, merchant, agent) attributed to the right party, each with the matching PayPal action.</p></div>
+  <div class="box"><div class="big">50 / 50</div><p>a real shared-fault case: a false signed "waterproof" claim plus an unstated need. Merchant refund of 45.26.</p></div>
+</div>
+<table>
+  <tr><th>Case</th><th>Fault found</th><th>PayPal movement (sandbox id)</th></tr>
+  <tr><td>Shopper stated the wrong size</td><td>User 100%</td><td>void of authorization <span class="mono">0XU54803RE449331J</span></td></tr>
+  <tr><td>Merchant shipped a different item</td><td>Merchant 100% (by the facts)</td><td>refund <span class="mono">6VC997542C814874E</span>, 160.88</td></tr>
+  <tr><td>Agent ignored "cheapest"</td><td>Agent 100%</td><td>payout <span class="mono">ASF3PFT6573V2</span>, 10.83, from the liability pool</td></tr>
+  <tr><td>False "waterproof" claim</td><td>User 50%, merchant 50% (k = 8, 64 replays)</td><td>refund <span class="mono">3AA89058PW941291F</span>, 45.26</td></tr>
+</table>
+<p>The baseline (PayPal Agent Toolkit, same model) typed its own totals: it created an order for 149.00 where the merchant's signed price plus shipping and tax is 160.88, over the user's 150 budget. Attack success and utility for baseline vs Provenant run daily on 120 attack tasks (a 60-payload Adversarial Lab dataset) and 50 benign tasks; attribution accuracy runs nightly on planted faults.</p>
+
+<h2>Engineering</h2>
+<ul>
+  <li>Python 3.12, FastAPI, SQLAlchemy and Alembic, Postgres; Next.js buyer app and AG Grid operations console in a "Roman tribunal" design.</li>
+  <li>573 tests; 100% coverage of the security core; Postgres integration tests; Playwright screenshots of every screen.</li>
+  <li>Deployed on Render (API, merchant simulator, buyer app, Postgres) with verified PayPal webhooks.</li>
+</ul>
+
+<h2>Limitations</h2>
+<ul>
+  <li>Untrusted content may still influence which compliant item is chosen; Lineage guarantees the purchase satisfies the mandate, not that it is the best choice. Blackbox handles that residual risk.</li>
+  <li>Merchants are simulated storefronts with real PayPal sandbox accounts; buyer-side dispute creation is a manual sandbox step.</li>
+  <li>Free model tiers bound how many replays and evaluation tasks run per day.</li>
+</ul>
+
+<h2>Links</h2>
+<p class="mono">Code: github.com/bytes06runner/Provenant<br>Live (staging): provenant-web-staging.onrender.com</p>
+<p class="muted">Tools: PayPal REST APIs, PayPal JS SDK v6, PayPal Agent Toolkit, PayPal AI-Toolkit plugin, Claude Code, Groq, Google AI Studio, AG Grid, React Flow, Render.</p>
+</body>
+</html>
