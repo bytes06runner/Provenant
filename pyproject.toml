@@ -65,6 +65,10 @@ python_version = "3.12"
 strict = true
 packages = ["paypal", "lineage", "blackbox", "llm", "merchants"]
 
+[[tool.mypy.overrides]]
+module = ["paypal_agent_toolkit.*"]  # PayPal's Agent Toolkit ships no type information
+ignore_missing_imports = true
+
 [tool.coverage.run]
 # Wiring that needs real keys, a registry and live services; exercised by the sandbox
 # integration tests (pytest -m sandbox), not by unit tests.

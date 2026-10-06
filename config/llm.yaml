@@ -54,6 +54,9 @@ calls:
   vision: {max_tokens: 512, temperature: "0", structured: schema}
   vision_escalation: {max_tokens: 1024, temperature: "0", structured: schema}
   narrator: {max_tokens: 800, temperature: "0.3", structured: schema}
+  # The baseline agent samples like the planner (same model, same temperature): the comparison
+  # isolates architecture, not decoding settings.
+  baseline: {max_tokens: 900, temperature: "0.7", structured: json}
 
 cache:
   extractor: always

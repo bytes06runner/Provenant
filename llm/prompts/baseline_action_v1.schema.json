@@ -1,0 +1,10 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["thought", "tool", "args"],
+  "properties": {
+    "thought": {"type": "string"},
+    "tool": {"type": "string", "enum": ["list_merchants", "open_page", "checkout", "finish"]},
+    "args": {"type": "object"}
+  }
+}

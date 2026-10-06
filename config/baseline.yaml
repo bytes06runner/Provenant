@@ -1,0 +1,8 @@
+# Baseline agent (CLAUDE.md section 7): the conventional tool-calling shopping agent that most
+# teams build, on PayPal's Agent Toolkit. Same model as Provenant's planner (LLM_BASELINE_*),
+# same merchants, same attacks. It reads pages directly and checks out with the toolkit's
+# create_order using the chosen merchant's credentials.
+prompt: baseline_agent_v1
+max_steps: 10
+page_chars: 6000            # page text handed to the model per open_page call
+toolkit_source: "PROVENANT-BASELINE"
