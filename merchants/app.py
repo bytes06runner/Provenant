@@ -25,13 +25,15 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from merchants.catalog import latest_seed
+from merchants.keystore import keys_dir as _keys_dir
 from merchants.keystore import load_or_create
+from merchants.keystore import registry_path as _registry_path
 from merchants.registry import load_records
 from merchants.storefront import PlantedAttack, Storefront, StorefrontError
 from paypal.config import CONFIG_DIR, REPO_ROOT
 
-KEYS_DIR = REPO_ROOT / "var" / "keys"
-REGISTRY_PATH = REPO_ROOT / "var" / "registry.json"
+KEYS_DIR = _keys_dir(REPO_ROOT / "var" / "keys")
+REGISTRY_PATH = _registry_path(REPO_ROOT / "var" / "registry.json")
 SEEDS_DIR = REPO_ROOT / "merchants" / "seeds"
 
 

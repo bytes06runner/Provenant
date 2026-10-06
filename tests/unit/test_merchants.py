@@ -371,3 +371,23 @@ def test_catalog_page_lists_every_item_and_escapes(world):
     page = client.get("/m/kestrel/catalog").text
     assert all(p.sku in page for p in stores["kestrel"].seed.products)
     assert "Shipping" in page and "<div class='banner'>" not in page
+
+
+def test_deployed_keys_are_read_only_and_paths_come_from_the_environment(tmp_path, monkeypatch):
+    from merchants import keystore
+
+    load_or_create(tmp_path, "northwind")  # exists now
+    monkeypatch.setenv("PROVENANT_KEYS_READONLY", "1")
+    assert keystore.read_only()
+    load_or_create(tmp_path, "northwind")  # loading an existing key is fine
+    with pytest.raises(KeystoreError, match="read-only"):
+        load_or_create(tmp_path, "kestrel")
+    assert not (tmp_path / "kestrel.ed25519.pem").exists()
+    monkeypatch.setenv("PROVENANT_KEYS_DIR", "/etc/secrets")
+    monkeypatch.setenv("PROVENANT_USER_KEYS_DIR", "/etc/secrets/u")
+    monkeypatch.setenv("PROVENANT_REGISTRY_PATH", "/etc/secrets/registry.json")
+    assert keystore.keys_dir(tmp_path) == Path("/etc/secrets")
+    assert keystore.user_keys_dir(tmp_path) == Path("/etc/secrets/u")
+    assert keystore.registry_path(tmp_path) == Path("/etc/secrets/registry.json")
+    monkeypatch.delenv("PROVENANT_KEYS_DIR")
+    assert keystore.keys_dir(tmp_path) == tmp_path

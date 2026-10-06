@@ -151,3 +151,14 @@ def test_resource_ids_lists_what_we_caused(ledger):
     client.post("/x", json={}, operation_key="a")
     ledger.begin("pending-op", "merchant:test", "POST", "/y")
     assert ledger.resource_ids() == {"R9"}
+
+
+def test_database_url_maps_render_urls_to_psycopg(monkeypatch):
+    from paypal.storage import database_url
+
+    monkeypatch.delenv("PROVENANT_DATABASE_URL", raising=False)
+    assert database_url("sqlite:///x.db") == "sqlite:///x.db"
+    monkeypatch.setenv("PROVENANT_DATABASE_URL", "postgres://u:p@h/db")
+    assert database_url("sqlite:///x.db") == "postgresql+psycopg://u:p@h/db"
+    monkeypatch.setenv("PROVENANT_DATABASE_URL", "postgresql://u:p@h/db")
+    assert database_url("x") == "postgresql+psycopg://u:p@h/db"

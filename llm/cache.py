@@ -22,6 +22,7 @@ from sqlalchemy.exc import IntegrityError
 
 from lineage.canonical import content_hash
 from llm.types import LLMRequest, LLMResponse
+from paypal.storage import ensure_schema
 
 metadata = MetaData()
 
@@ -47,7 +48,7 @@ def cache_key(provider: str, model: str, request: LLMRequest, sample_index: int 
 class ReplayCache:
     def __init__(self, engine: Engine) -> None:
         self.engine = engine
-        metadata.create_all(engine)  # replaced by Alembic migrations in Phase 1
+        ensure_schema(metadata, engine)  # SQLite only; Alembic owns Postgres
 
     def get(self, key: str) -> LLMResponse | None:
         q = select(llm_cache.c.response_json).where(llm_cache.c.cache_key == key)

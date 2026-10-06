@@ -17,6 +17,8 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import Column, DateTime, Integer, MetaData, String, Table, func, insert, select
 from sqlalchemy.engine import Engine
 
+from paypal.storage import ensure_schema
+
 metadata = MetaData()
 
 llm_usage = Table(
@@ -65,7 +67,7 @@ class BudgetTracker:
         self.limits = limits
         self.default = default
         self.now = now
-        metadata.create_all(engine)  # replaced by Alembic migrations in Phase 1
+        ensure_schema(metadata, engine)  # SQLite only; Alembic owns Postgres
 
     def limits_for(self, model: str) -> Limits:
         return self.limits.get(model, self.default)

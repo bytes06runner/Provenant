@@ -21,6 +21,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
 
 from paypal.client import PayPalClient
+from paypal.storage import ensure_schema
 
 metadata = MetaData()
 
@@ -91,7 +92,7 @@ class ReconciliationPoller:
         self.record = record  # (case_id, event_type, payload)
         self.interval = timedelta(seconds=interval_seconds)
         self.now = now
-        metadata.create_all(engine)  # replaced by Alembic migrations before deploy
+        ensure_schema(metadata, engine)  # SQLite only; Alembic owns Postgres
 
     def track(self, kind: str, resource_id: str, app: str, case_id: str) -> None:
         if kind not in KINDS:

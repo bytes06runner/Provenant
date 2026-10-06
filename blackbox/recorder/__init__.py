@@ -44,6 +44,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
 
 from lineage.canonical import canonicalize
+from paypal.storage import ensure_schema
 
 GENESIS_DOMAIN = b"provenant/recorder/v1/genesis"
 
@@ -159,7 +160,7 @@ class FlightRecorder:
     def __init__(self, engine: Engine, *, max_append_attempts: int = 5) -> None:
         self.engine = engine
         self.max_append_attempts = max_append_attempts
-        metadata.create_all(engine)  # replaced by Alembic migrations in Phase 1
+        ensure_schema(metadata, engine)  # SQLite only; Alembic owns Postgres
 
     # ---- writing -------------------------------------------------------------
 

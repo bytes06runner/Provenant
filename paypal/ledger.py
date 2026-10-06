@@ -35,6 +35,8 @@ from sqlalchemy import (
 from sqlalchemy.engine import Engine, RowMapping
 from sqlalchemy.exc import IntegrityError
 
+from paypal.storage import ensure_schema
+
 metadata = MetaData()
 
 paypal_requests = Table(
@@ -107,7 +109,7 @@ def _now() -> datetime:
 class RequestLedger:
     def __init__(self, engine: Engine) -> None:
         self.engine = engine
-        metadata.create_all(engine)  # replaced by Alembic migrations in Phase 1
+        ensure_schema(metadata, engine)  # SQLite only; Alembic owns Postgres
 
     @classmethod
     def from_url(cls, url: str) -> RequestLedger:

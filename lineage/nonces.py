@@ -8,6 +8,8 @@ from sqlalchemy import Column, DateTime, MetaData, String, Table, insert
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
 
+from paypal.storage import ensure_schema
+
 metadata = MetaData()
 
 mandate_nonces = Table(
@@ -22,7 +24,7 @@ mandate_nonces = Table(
 class SqlNonceRegistry:
     def __init__(self, engine: Engine) -> None:
         self.engine = engine
-        metadata.create_all(engine)  # replaced by Alembic migrations in Phase 1
+        ensure_schema(metadata, engine)  # SQLite only; Alembic owns Postgres
 
     def claim(self, user_id: str, nonce: str) -> bool:
         try:

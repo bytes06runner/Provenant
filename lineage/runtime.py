@@ -28,10 +28,10 @@ from lineage.nonces import SqlNonceRegistry
 from lineage.purchase import PurchaseSession
 from lineage.signing import key_id
 from lineage.toolbox import HttpToolbox
-from lineage.vault import Address, AddressVault
+from lineage.vault import Address, AddressVault, SqlAddressVault, VaultError
 from llm import build_router
 from llm.router import LLMRouter
-from merchants.keystore import load_or_create
+from merchants.keystore import load_or_create, registry_path, user_keys_dir
 from merchants.registry import MerchantRecord, key_registry, load_records
 from paypal.client import PayPalClient
 from paypal.config import (
@@ -45,6 +45,7 @@ from paypal.config import (
     require_env,
 )
 from paypal.ledger import RequestLedger
+from paypal.storage import database_url
 
 Sink = Callable[[str, dict[str, Any]], None]
 
@@ -73,13 +74,20 @@ class Runtime:
     def load(cls, var: Path | None = None) -> Runtime:
         load_env()
         var = var or REPO_ROOT / "var"
-        engine = create_engine(f"sqlite:///{var / 'provenant.db'}")
-        records = load_records(var / "registry.json")
+        var.mkdir(exist_ok=True)
+        engine = create_engine(
+            database_url(f"sqlite:///{var / 'provenant.db'}"), pool_pre_ping=True
+        )
+        records = load_records(registry_path(var / "registry.json"))
         return cls(
             var=var,
             engine=engine,
             recorder=FlightRecorder(engine),
-            ledger=RequestLedger.from_url(f"sqlite:///{var / 'ledger.db'}"),
+            ledger=RequestLedger(
+                engine
+                if engine.dialect.name != "sqlite"
+                else create_engine(f"sqlite:///{var / 'ledger.db'}")
+            ),
             records=records,
             keys=key_registry(records),
             http=httpx.Client(timeout=30),
@@ -108,9 +116,14 @@ class Runtime:
         return merchant_credentials(merchant_id)
 
     def vault(self, user_id: str) -> AddressVault:
-        vault = AddressVault()
+        """The user's confirmed addresses, persisted. Demo shoppers' addresses (config) are
+        confirmed into it on first use, as the buyer app's address form would."""
+        vault = SqlAddressVault(self.engine)
         for ref, addr in self.users[user_id]["addresses"].items():
-            vault.save_confirmed(user_id, ref, Address(**addr))
+            try:
+                vault.lookup(user_id, ref)
+            except VaultError:
+                vault.save_confirmed(user_id, ref, Address(**addr))
         return vault
 
     def toolbox(self, sink: Sink, *, rank_prompt: str = "rank_v1") -> HttpToolbox:
@@ -131,7 +144,7 @@ class Runtime:
         self, user_id: str, *, rank_prompt: str = "rank_v1", session_id: str | None = None
     ) -> PurchaseSession:
         session_id = session_id or f"s-{uuid.uuid4().hex[:12]}"
-        user_key = load_or_create(self.var / "keys" / "users", user_id)
+        user_key = load_or_create(user_keys_dir(self.var / "keys" / "users"), user_id)
 
         def sink(event_type: str, payload: dict[str, Any]) -> None:
             self.recorder.append(session_id, event_type, payload)
@@ -162,7 +175,7 @@ class Runtime:
     # ---- recourse ---------------------------------------------------------------------
 
     def case_deps(self, user_id: str) -> CaseDeps:
-        user_key = load_or_create(self.var / "keys" / "users", user_id)
+        user_key = load_or_create(user_keys_dir(self.var / "keys" / "users"), user_id)
 
         def client(app: str) -> PayPalClient:
             return self.operator() if app == "operator" else self.paypal(app)

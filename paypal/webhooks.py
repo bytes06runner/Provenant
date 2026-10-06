@@ -25,6 +25,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
 
 from paypal.client import PayPalClient, PayPalError
+from paypal.storage import ensure_schema
 
 TRANSMISSION_HEADERS = {
     "auth_algo": "paypal-auth-algo",
@@ -68,7 +69,7 @@ class IntakeResult:
 class WebhookStore:
     def __init__(self, engine: Engine) -> None:
         self.engine = engine
-        metadata.create_all(engine)  # replaced by Alembic migrations in Phase 1
+        ensure_schema(metadata, engine)  # SQLite only; Alembic owns Postgres
 
     def add(self, app_label: str, event: dict[str, Any], transmission_id: str | None) -> bool:
         """Store a verified event. Returns False if this event id was already stored."""

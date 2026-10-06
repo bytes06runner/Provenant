@@ -267,3 +267,26 @@ def test_restocking_fee_must_be_a_fraction(fee):
     payload["policy"] = {**payload["policy"], "restocking_fee": fee}
     with pytest.raises(ValueError):
         MerchantManifest(**payload)
+
+
+def test_sql_vault_persists_and_labels_like_the_memory_vault():
+    from sqlalchemy import create_engine
+    from sqlalchemy.pool import StaticPool
+
+    from lineage.labels import Label
+    from lineage.vault import Address, SqlAddressVault, VaultError
+
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    home = Address(
+        full_name="B", address_line_1="1 Main St", admin_area_2="San Jose", country_code="US"
+    )
+    SqlAddressVault(engine).save_confirmed("u1", "home", home)
+    moved = home.model_copy(update={"address_line_1": "2 Oak Ave"})
+    SqlAddressVault(engine).save_confirmed("u1", "home", moved)  # a re-confirmation replaces it
+    got = SqlAddressVault(engine).lookup("u1", "home")  # a new instance: read from the table
+    assert got.value == moved and got.label is Label.USER
+    assert got.source_refs() == {"vault:u1:home"}
+    with pytest.raises(VaultError):
+        SqlAddressVault(engine).lookup("u2", "home")
