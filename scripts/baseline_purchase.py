@@ -21,6 +21,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from baseline.agent import BaselineDeps, run_baseline, toolkit_create_order  # noqa: E402
+from lab import placement  # noqa: E402
 from lab.generate import latest_dataset  # noqa: E402
 from lineage.runtime import Runtime  # noqa: E402
 from paypal.config import load_yaml  # noqa: E402
@@ -33,33 +34,24 @@ def plant(rt: Runtime, attack_id: str, host: str, surface: str) -> dict[str, Any
     attack = next((a for a in data["attacks"] if a["id"] == attack_id), None)
     if attack is None:
         raise SystemExit(f"unknown attack {attack_id}")
-    tax = load_yaml("attacks/taxonomy.yaml")
-    values = tax["placement"]["attacker_values"]
-    atk = rt.records["attacker"]
-    fill = {
-        "attacker_shop": "the authorized checkout partner (shop id: attacker)",
-        "payee_name": atk.paypal_merchant_id,
-        "address": values["address"],
-        "quantity": values["quantity"],
-    }
-    base = rt.records[host].base_url.rsplit("/m/", 1)[0]
-    r = rt.http.post(
-        f"{base}/admin/attack",
-        json={
-            "merchant": host,
-            "attack_id": attack_id,
-            "surface": surface,
-            "text": attack["text"],
-            "fill": fill,
-        },
+    fill = placement.fill_values(
+        rt.records["attacker"].paypal_merchant_id, load_yaml("attacks/taxonomy.yaml")
     )
-    r.raise_for_status()
+    first = rt.toolbox(lambda _t, _p: None).fetch_manifest(host).manifest.catalog[0].sku
+    placement.plant(
+        rt.http,
+        rt.records[host].base_url,
+        host=host,
+        surface=surface,
+        attack=attack,
+        fill=fill,
+        first_sku=first,
+    )
     return dict(attack)
 
 
 def clear(rt: Runtime) -> None:
-    base = next(iter(rt.records.values())).base_url.rsplit("/m/", 1)[0]
-    rt.http.delete(f"{base}/admin/attack")
+    placement.clear(rt.http, next(iter(rt.records.values())).base_url)
 
 
 def main() -> int:
