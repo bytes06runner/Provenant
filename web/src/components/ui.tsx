@@ -83,7 +83,7 @@ export function Meander({ className = "" }: { className?: string }) {
       <svg width="100%" height="14" preserveAspectRatio="none">
         <defs>
           <pattern id="meander" width="28" height="14" patternUnits="userSpaceOnUse">
-            <path d="M0 13 H22 V1 H6 V9 H16 V5 H11" fill="none" stroke="currentColor" strokeWidth="1.4" />
+            <path d="M0 13 H28 M22 13 V1 H6 V9 H16 V5 H11" fill="none" stroke="currentColor" strokeWidth="1.4" />
           </pattern>
         </defs>
         <rect width="100%" height="14" fill="url(#meander)" />

@@ -214,6 +214,9 @@ def provenance_graph(events: list[tuple[str, dict[str, Any]]]) -> dict[str, Any]
             f = (b.get("fields") or {}).get(name)
             if f is None or name not in bad:
                 continue
+            accepted = (final or {}).get("fields", {}).get(name) if final else None
+            if accepted and (accepted["value"], accepted["label"]) == (f["value"], f["label"]):
+                continue  # unchanged by the attack: flagged only for consistency, not drawn
             fid = f"b{i}:{name}"
             attempt_fields.append(
                 {

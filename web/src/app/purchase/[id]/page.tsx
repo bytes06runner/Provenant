@@ -89,7 +89,10 @@ export default function PurchaseRun() {
     }
   }
 
-  const visible = steps.filter((s) => showCalls || (s.type !== "llm.call" && !s.type.startsWith("llm.")));
+  // tool.fetch_manifest and tool.precheck repeat what the signature check and the contract
+  // checker report next; they stay in the recorder and appear with "Show model calls".
+  const REPEATS = new Set(["tool.fetch_manifest", "tool.precheck"]);
+  const visible = steps.filter((s) => showCalls || (!s.type.startsWith("llm.") && !REPEATS.has(s.type)));
   const state = info?.state ?? "running";
   const chosen = info?.chosen;
 

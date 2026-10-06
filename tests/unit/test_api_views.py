@@ -162,6 +162,11 @@ def test_provenance_graph_links_fields_to_sources_and_marks_blocked_paths():
     assert sum(e["from"] == price["id"] for e in g["edges"]) == 2
     attempt = g["blocked"][0]
     assert [f["name"] for f in attempt["fields"]] == ["Payee"]  # only the violating field
+    blocked["violations"].append(
+        {"field": "unit_price", "rule": "manifest_differs_from_payee", "detail": "y"}
+    )
+    again = provenance_graph([("contract.final", final), ("contract.blocked", blocked)])
+    assert [f["name"] for f in again["blocked"][0]["fields"]] == ["Payee"]  # same value: not drawn
     assert attempt["fields"][0]["blocked"] and attempt["order_builder"].startswith("refused")
     bad = [e for e in g["edges"] if e.get("violating")]
     assert len(bad) == 1 and bad[0]["label"] == "UNTRUSTED"

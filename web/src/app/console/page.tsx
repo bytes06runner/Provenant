@@ -160,7 +160,7 @@ export default function Console() {
   const kinds = ["pure_user", "pure_merchant", "pure_agent", "mixed"];
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+    <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
       <h1 className="display text-4xl sm:text-5xl">Operations</h1>
       <p className="mt-3 text-muted">Recourse queue, the PayPal ledger joined with the Flight Recorder, and the evaluation.</p>
 

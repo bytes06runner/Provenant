@@ -23,8 +23,10 @@ export const gridTheme = themeQuartz.withParams({
 
 export function Grid<T>({ rows, columns, height = 420 }: { rows: T[]; columns: ColDef<T>[]; height?: number }) {
   return (
-    <div style={{ height }} className="overflow-hidden rounded-xl border border-line">
+    // Short tables size to their rows; long ones scroll inside a fixed height.
+    <div style={rows.length <= 10 ? undefined : { height }} className="overflow-hidden rounded-xl border border-line">
       <AgGridReact<T>
+        domLayout={rows.length <= 10 ? "autoHeight" : "normal"}
         theme={gridTheme}
         rowData={rows}
         columnDefs={columns}
