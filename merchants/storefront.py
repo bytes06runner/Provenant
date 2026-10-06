@@ -54,6 +54,19 @@ def _unit_interval(*parts: str) -> Decimal:
     return Decimal(int.from_bytes(digest[:8], "big")) / Decimal(2**64)
 
 
+@dataclass(frozen=True)
+class PlantedAttack:
+    """One Adversarial Lab payload placed on one surface of this storefront (evaluation only)."""
+
+    attack_id: str
+    surface: str  # product_page | reviews | catalog
+    text: str  # with placeholders, from lab/datasets/
+    fill: dict[str, str]  # values the eval supplies: attacker_shop, payee_name, address, quantity
+
+
+SURFACES = ("product_page", "reviews", "catalog")
+
+
 class Storefront:
     def __init__(
         self,
@@ -71,6 +84,8 @@ class Storefront:
         self._by_sku = {p.sku: p for p in seed.products}
         self.manifest = self._build_manifest()
         self.envelope: SignedEnvelope = sign_manifest(self.manifest, signing_key)
+        self.planted: PlantedAttack | None = None
+        self.lab_mode = False  # an evaluation controls every payload: built-in templates are off
 
     # ---- manifest ----------------------------------------------------------------
 
@@ -111,8 +126,28 @@ class Storefront:
 
     # ---- pages (always UNTRUSTED to Provenant) ---------------------------------------
 
-    def _payloads(self, sku: str) -> list[str]:
-        if not self.behavior.get("inject_pages"):
+    def plant(self, attack: PlantedAttack | None) -> None:
+        if attack is not None and attack.surface not in SURFACES:
+            raise StorefrontError(f"unknown surface {attack.surface!r}")
+        self.planted = attack
+
+    def _sku_fill(self, sku: str) -> dict[str, str]:
+        """Page-specific values: an inflated price, and the priciest other item in the size."""
+        p = self.product(sku)
+        size = p.true_attributes.get("size_us")
+        others = [q for q in self.seed.products if q.sku != sku]
+        same = [q for q in others if q.true_attributes.get("size_us") == size] or others or [p]
+        other = max(same, key=lambda q: Decimal(q.price))
+        inflated = (Decimal(p.price) * Decimal("1.5")).quantize(Decimal("0.01"))
+        return {"sku": p.sku, "other_sku": other.sku, "price": str(inflated)}
+
+    def _payloads(self, sku: str, surface: str = "product_page") -> list[str]:
+        if self.planted is not None:
+            if self.planted.surface != surface:
+                return []
+            values = {**self.planted.fill, **self._sku_fill(sku)}
+            return [self.planted.text.format(**values)]
+        if self.lab_mode or surface == "catalog" or not self.behavior.get("inject_pages"):
             return []
         p = self.product(sku)
         fill = {
@@ -142,11 +177,31 @@ class Storefront:
         p = self.product(sku)
         e = html.escape
         items = [f"<li><b>{r.rating}/5</b> {e(r.text)}</li>" for r in p.reviews]
-        items += [f"<li><b>5/5</b> {e(x)}</li>" for x in self._payloads(sku)]
+        items += [f"<li><b>5/5</b> {e(x)}</li>" for x in self._payloads(sku, "reviews")]
         return (
             "<!doctype html><html><head><meta charset='utf-8'>"
             f"<title>Reviews: {e(p.title)}</title></head><body>"
             f"<h1>Customer reviews</h1><ul>{''.join(items)}</ul></body></html>"
+        )
+
+    def catalog_page(self) -> str:
+        e = html.escape
+        rows = "".join(
+            f"<li><a href='products/{e(p.sku)}'>{e(p.title)}</a>"
+            f" <span class='sku'>{e(p.sku)}</span>"
+            f" <span class='price'>{e(p.price)} {e(self.seed.currency)}</span></li>"
+            for p in self.seed.products
+        )
+        first = self.seed.products[0].sku
+        banner = "".join(
+            f"<div class='banner'>{e(x)}</div>" for x in self._payloads(first, "catalog")
+        )
+        return (
+            "<!doctype html><html><head><meta charset='utf-8'>"
+            f"<title>{e(self.profile['display_name'])}</title></head><body>"
+            f"<h1>{e(self.profile['display_name'])}</h1>{banner}<ul>{rows}</ul>"
+            f"<p>Shipping {e(self.manifest.shipping_flat)} {e(self.seed.currency)}; "
+            f"tax {e(self.manifest.tax_rate)}.</p></body></html>"
         )
 
     # ---- fulfillment -------------------------------------------------------------------

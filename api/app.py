@@ -495,7 +495,10 @@ def create_app(rt: Runtime | None = None) -> FastAPI:
                 with rt.paypal(mid) as c:
                     o = c.get(f"/v2/checkout/orders/{oid}").body
             except PayPalError as err:
-                r["status"], r["error"] = "UNKNOWN", err.summary()
+                # PayPal deletes orders that were never approved; say so rather than "unknown".
+                gone = "RESOURCE_NOT_FOUND" in err.summary()
+                r["status"] = "EXPIRED" if gone else "UNKNOWN"
+                r["error"] = err.summary()
                 return r
             pu = (o.get("purchase_units") or [{}])[0]
             r["status"] = o.get("status")

@@ -5,7 +5,9 @@
     GET  /m/{merchant}/.well-known/provenant-keys.json       public key (for onboarding only)
     GET  /m/{merchant}/products/{sku}                         product page (untrusted HTML)
     GET  /m/{merchant}/reviews/{sku}                          reviews page (untrusted HTML)
+    GET  /m/{merchant}/catalog                                catalog page (untrusted HTML)
     POST /m/{merchant}/fulfill   {"order_ref": ..., "sku": ...}  simulated shipment
+    GET|POST|DELETE /admin/attack   place one Adversarial Lab payload (SIMULATOR_ALLOW_PLANTED=1)
 
 Run: uvicorn merchants.app:app --port 8710   (after scripts/seed_catalog.py and
 scripts/register_merchants.py)
@@ -25,12 +27,20 @@ from pydantic import BaseModel
 from merchants.catalog import latest_seed
 from merchants.keystore import load_or_create
 from merchants.registry import load_records
-from merchants.storefront import Storefront, StorefrontError
+from merchants.storefront import PlantedAttack, Storefront, StorefrontError
 from paypal.config import CONFIG_DIR, REPO_ROOT
 
 KEYS_DIR = REPO_ROOT / "var" / "keys"
 REGISTRY_PATH = REPO_ROOT / "var" / "registry.json"
 SEEDS_DIR = REPO_ROOT / "merchants" / "seeds"
+
+
+class AttackRequest(BaseModel):
+    merchant: str
+    attack_id: str
+    surface: str
+    text: str
+    fill: dict[str, str] = {}
 
 
 class FulfillRequest(BaseModel):
@@ -89,6 +99,49 @@ def create_app(stores: dict[str, Storefront], *, allow_planted: bool = False) ->
             return store(merchant).product_page(sku)
         except StorefrontError as e:
             raise HTTPException(404, str(e)) from None
+
+    @app.get("/m/{merchant}/catalog", response_class=HTMLResponse)
+    def catalog_page(merchant: str) -> str:
+        return store(merchant).catalog_page()
+
+    def planted_only() -> None:
+        if not allow_planted:
+            raise HTTPException(403, "planted attacks are disabled (SIMULATOR_ALLOW_PLANTED)")
+
+    @app.get("/admin/attack")
+    def current_attack() -> dict[str, Any]:
+        planted_only()
+        active = [
+            {"merchant": k, "attack_id": s.planted.attack_id, "surface": s.planted.surface}
+            for k, s in stores.items()
+            if s.planted is not None
+        ]
+        return {"active": active}
+
+    @app.post("/admin/attack")
+    def plant_attack(body: AttackRequest) -> dict[str, Any]:
+        """Place exactly one attack: any previously planted attack is removed first."""
+        planted_only()
+        target = store(body.merchant)
+        for s in stores.values():
+            s.plant(None)
+            s.lab_mode = True
+        try:
+            target.plant(PlantedAttack(body.attack_id, body.surface, body.text, dict(body.fill)))
+            # Render once now so a payload with a missing value fails here, not mid-evaluation.
+            target._payloads(target.seed.products[0].sku, body.surface)  # noqa: SLF001
+        except (StorefrontError, KeyError, ValueError, IndexError) as e:
+            target.plant(None)
+            raise HTTPException(422, f"cannot plant: {e}") from None
+        return current_attack()
+
+    @app.delete("/admin/attack")
+    def clear_attack() -> dict[str, Any]:
+        planted_only()
+        for s in stores.values():
+            s.plant(None)
+            s.lab_mode = False
+        return {"active": []}
 
     @app.get("/m/{merchant}/reviews/{sku}", response_class=HTMLResponse)
     def reviews_page(merchant: str, sku: str) -> str:
