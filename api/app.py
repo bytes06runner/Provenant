@@ -15,6 +15,7 @@ import base64
 import binascii
 import json
 import os
+import re
 import threading
 import time
 import traceback
@@ -32,9 +33,12 @@ from blackbox.intake import Complaint, IntakeError, case_id_for, clarify_edits
 from blackbox.reconcile import ReconciliationPoller
 from blackbox.replay import ReplaySettings
 from eval.attribution import load_rows, summarize
+from lineage.contracts import compute_total
 from lineage.fulfillment import FulfillmentError, authorize_recorded
 from lineage.interpreter import Proposal
 from lineage.mandate import VerifiedMandate
+from lineage.manifest import ManifestError
+from lineage.money import parse_amount, parse_fraction
 from lineage.probes import payee_swap
 from lineage.purchase import OrderResult, PurchaseSession
 from lineage.runtime import Runtime
@@ -457,6 +461,69 @@ def create_app(rt: Runtime | None = None) -> FastAPI:
         if signed is None:
             raise HTTPException(404, f"no signed purchase for {case}")
         return str(signed["envelope"]["payload"]["user_id"])
+
+    # ---- 4b. the baseline agent's recorded runs (the "before" picture) ------------------
+
+    @app.get("/api/baseline/{sid}")
+    def baseline_run(sid: str) -> dict[str, Any]:
+        evs = rt.recorder.events(sid)
+        if not sid.startswith("b-") or not evs:
+            raise HTTPException(404, f"no baseline run {sid}")
+        request = next(
+            (e.payload.get("text") for e in evs if e.event_type == "baseline.request"), None
+        )
+        attack = next((dict(e.payload) for e in evs if e.event_type == "lab.attack"), None)
+        steps = [dict(e.payload) for e in evs if e.event_type == "baseline.step"]
+        order = next((dict(e.payload) for e in evs if e.event_type == "baseline.order"), None)
+        out: dict[str, Any] = {"id": sid, "request": request, "attack": attack, "steps": steps}
+        if order:
+            pp = order.get("paypal") or {}
+            names = " ".join(str(i.get("name", "")) for i in pp.get("items", []))
+            found = re.search(r"\b([A-Z]{3}-\d{3})\b", names)
+            signed = None
+            if found and order["merchant"] in rt.records:
+                # What the merchant actually signed for that item, for comparison.
+                m = rt.toolbox(lambda _t, _p: None).fetch_manifest(order["merchant"])
+                try:
+                    p = m.product(found.group(1))
+                    signed = {
+                        "sku": p.sku,
+                        "price": p.price,
+                        "total": str(
+                            compute_total(
+                                parse_amount(p.price),
+                                1,
+                                parse_amount(m.manifest.shipping_flat),
+                                parse_fraction(m.manifest.tax_rate),
+                            )
+                        ),
+                        "payee": m.manifest.paypal_merchant_id,
+                    }
+                except ManifestError:
+                    signed = None
+            out["order"] = {
+                "merchant": order["merchant"],
+                "id": (order.get("order") or {}).get("id"),
+                "paypal": pp,
+                "signed": signed,
+                "attacker_payee": rt.records["attacker"].paypal_merchant_id
+                if "attacker" in rt.records
+                else None,
+            }
+        return out
+
+    @app.get("/api/baseline")
+    def baseline_runs(limit: int = 20) -> dict[str, Any]:
+        rows = []
+        for ev in rt.recorder.latest("baseline.request", limit=limit):
+            rows.append(
+                {
+                    "id": ev.session_id,
+                    "request": ev.payload.get("text"),
+                    "at": ev.recorded_at.isoformat(),
+                }
+            )
+        return {"runs": rows}
 
     # ---- 5. evaluation -----------------------------------------------------------------
 
