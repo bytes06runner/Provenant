@@ -82,7 +82,7 @@ class WebhookStore:
                         app_label=app_label,
                         event_type=event.get("event_type", ""),
                         resource_type=event.get("resource_type"),
-                        resource_id=_resource_id(resource),
+                        resource_id=resource_id_of(resource),
                         transmission_id=transmission_id,
                         received_at=datetime.now(UTC),
                         raw_json=json.dumps(event, sort_keys=True),
@@ -100,7 +100,7 @@ class WebhookStore:
             return [dict(r) for r in conn.execute(q).mappings()]
 
 
-def _resource_id(resource: dict[str, Any]) -> str | None:
+def resource_id_of(resource: dict[str, Any]) -> str | None:
     if isinstance(resource.get("batch_header"), dict):
         value = resource["batch_header"].get("payout_batch_id")
     else:

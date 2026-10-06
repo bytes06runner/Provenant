@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import json
 import os
 import threading
 import time
@@ -21,13 +22,14 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from api.views import case_view, provenance_graph, session_from_events, short, step
 from blackbox.case import CaseError, approve_case, run_case
 from blackbox.intake import Complaint, IntakeError, case_id_for, clarify_edits
+from blackbox.reconcile import ReconciliationPoller
 from blackbox.replay import ReplaySettings
 from eval.attribution import load_rows, summarize
 from lineage.fulfillment import FulfillmentError, authorize_recorded
@@ -37,8 +39,9 @@ from lineage.probes import payee_swap
 from lineage.purchase import OrderResult, PurchaseSession
 from lineage.runtime import Runtime
 from llm import roles
-from paypal.client import PayPalError
+from paypal.client import PayPalClient, PayPalError
 from paypal.config import load_yaml
+from paypal.webhooks import Outcome, WebhookStore, handle_delivery, resource_id_of
 
 
 @dataclass
@@ -81,13 +84,22 @@ class RunRequest(BaseModel):
     probe_attacks: bool = True
 
 
+def _env_list(name: str, default: list[str]) -> list[str]:
+    raw = os.environ.get(name, "").strip()
+    return [x.strip() for x in raw.split(",") if x.strip()] if raw else list(default)
+
+
 def create_app(rt: Runtime | None = None) -> FastAPI:
     rt = rt or Runtime.load()
     web = load_yaml("app.yaml")["web"]
+    # Deployed origins and the domain the PayPal client token is bound to come from the
+    # environment; config/app.yaml holds the local defaults.
+    origins = _env_list("PROVENANT_CORS_ORIGINS", web["cors_origins"])
+    token_domains = _env_list("PROVENANT_CLIENT_TOKEN_DOMAINS", web["client_token_domains"])
     app = FastAPI(title="Provenant API")
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=list(web["cors_origins"]),
+        allow_origins=origins,
         allow_methods=["GET", "POST"],
         allow_headers=["Content-Type"],
     )
@@ -286,7 +298,7 @@ def create_app(rt: Runtime | None = None) -> FastAPI:
             raise HTTPException(404, f"unknown merchant {merchant}")
         try:
             with rt.paypal(merchant) as c:
-                token = c.browser_client_token(list(web["client_token_domains"]))
+                token = c.browser_client_token(token_domains)
         except PayPalError as err:
             raise HTTPException(502, err.summary()) from err
         return {"clientToken": token}
@@ -476,7 +488,59 @@ def create_app(rt: Runtime | None = None) -> FastAPI:
             ],
         }
 
-    # ---- 6. orders ---------------------------------------------------------------------
+    # ---- 6. webhooks and reconciliation ------------------------------------------------
+
+    def client_for(app_label: str) -> PayPalClient:
+        return rt.operator() if app_label == "operator" else rt.paypal(app_label)
+
+    def record_case(case: str, event_type: str, payload: dict[str, Any]) -> None:
+        rt.recorder.append(case, event_type, payload)
+
+    poller = ReconciliationPoller(rt.engine, client_for, record=record_case, interval_seconds=5)
+    webhooks = WebhookStore(rt.engine)
+
+    @app.post("/api/webhooks/paypal/{app_label}")
+    async def paypal_webhook(app_label: str, request: Request) -> Response:
+        """Verified with PayPal, stored once, then only a hint: the poller GETs the resource.
+        A missing, late, duplicated or forged webhook cannot change state."""
+        if app_label != "operator" and app_label not in rt.records:
+            raise HTTPException(404, "unknown app")
+        webhook_id = os.environ.get(f"PAYPAL_WEBHOOK_ID_{app_label.upper()}", "")
+        if not webhook_id:
+            raise HTTPException(503, "webhook not registered for this app")
+        raw = await request.body()
+        with client_for(app_label) as verifier:
+            result = handle_delivery(
+                app_label=app_label,
+                webhook_id=webhook_id,
+                headers=dict(request.headers),
+                raw_body=raw,
+                verifier=verifier,
+                store=webhooks,
+            )
+        if result.outcome is Outcome.ACCEPTED:
+            event = json.loads(raw)
+            rid = resource_id_of(event.get("resource") or {})
+            if rid:
+                poller.hint(rid)
+        return Response(
+            json.dumps({"outcome": result.outcome.value, "reason": result.reason}),
+            status_code=result.http_status,
+            media_type="application/json",
+        )
+
+    def reconcile_forever() -> None:
+        while True:
+            try:
+                poller.poll_due()
+            except Exception:  # noqa: BLE001  (keep reconciling; the next round retries)
+                traceback.print_exc()
+            time.sleep(float(web["reconcile_interval_seconds"]))
+
+    if os.environ.get("PROVENANT_RECONCILE_LOOP", "1") == "1":
+        threading.Thread(target=reconcile_forever, name="reconcile", daemon=True).start()
+
+    # ---- 7. orders ---------------------------------------------------------------------
 
     @app.get("/api/orders")
     def orders(limit: int = 20) -> dict[str, Any]:

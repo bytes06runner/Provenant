@@ -70,3 +70,4 @@ web:
   approval_poll_seconds: 2
   approval_timeout_seconds: 60
   max_photo_bytes: 4000000
+  reconcile_interval_seconds: 10  # the API's background poller (webhooks only make it poll sooner)
