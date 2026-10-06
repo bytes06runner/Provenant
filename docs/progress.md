@@ -606,11 +606,14 @@ blackbox, llm and merchants is kept.
 | Scenario | Planted fault | Result |
 |---|---|---|
 | pure_merchant | Bayline ships BAY-007 (red knit) for BAY-001 | **PASS**: M by the facts; capture `7S404727D6704351F`; refund `6VC997542C814874E` COMPLETED 160.88; reconciled; no discrepancies |
-| pure_user | stated size 10, needed 10.5 | replay cut off by the daily token budget before the void (nothing moved); partial replays all point to U; queued for 00:05 UTC |
-| pure_agent | planted "most expensive first" ranker | order approved, authorization `39917564Y0801271X`; queued for 00:05 UTC (payout of 10.83) |
-| Kestrel (real case, k=8) | false signed "waterproof: yes" + unstated need | k=4 dry run: U 50 / M 50, refund of 45.26 proposed; the k=8 run with approval is queued for 00:05 UTC |
+| pure_user | stated size 10, needed 10.5 | **PASS**: U = 1.00 (interval U 0.74 to 1.00); void of authorization `0XU54803RE449331J`, VOIDED |
+| pure_agent | planted "most expensive first" ranker | **PASS**: A = 1.00 (interval A 0.74 to 1.00); payout batch `ASF3PFT6573V2` of 10.83 from the operator pool, reconciled PENDING, PROCESSING, SUCCESS |
+| Kestrel (real case, k=8) | false signed "waterproof: yes" + unstated need | **Done**: U 0.50 (0.39 to 0.58), M 0.50 (0.40 to 0.58), A 0 (0 to 0.11); refund `3AA89058PW941291F` COMPLETED 45.26 from Kestrel, user absorbs 45.26; reconciled, no discrepancies |
 
-The three queued runs start automatically (`var/after_reset.sh`), in that order.
+**Phase 2 acceptance met (2026-10-06):** all three planted scenarios produce the planted majority
+fault and the matching PayPal money movement (void, refund, payout), and the first real case ran
+end to end with a real refund. Note: the Mac slept during the overnight queue, so pure_user took
+2.5 hours instead of minutes; the session now holds a keep-awake while work runs.
 
 ### Decisions and changes (2026-10-06)
 - **Intervals: Jeffreys, not bootstrap.** Each coalition's v(S) gets Beta(x + 1/2, k - x + 1/2);
@@ -649,3 +652,23 @@ merchant, pure agent and mixed (U+M); planted preconditions are checked before t
   v6, from S8), orders with live PayPal status. Verified in the browser on a real run
   (s-136822e0cc04): the agent chose the cheapest compliant item, both live payee hijacks were
   blocked, and the graph shows each field's sources and the violating paths.
+
+
+## 2026-10-06: Phase 3 progress
+
+- **Blackbox screens:** report a problem (clarified intent, what arrived, photo), the ruling page
+  (numbered findings, counterfactual table with Jeffreys intervals, fault bars with interval
+  brackets, holding, remedy with PayPal ids, evidence pack), recourse list.
+- **Ops Console (AG Grid Community):** recourse queue with one-click approval
+  (`approve_case`, idempotent through the request ledger), ledger joining live PayPal state with
+  cases, evaluation tab.
+- **Adversarial Lab:** `config/attacks/taxonomy.yaml` (5 goals x 3 surfaces x 6 techniques),
+  `lab/generate.py`, frozen dataset `lab/datasets/attacks-20261006.json` (60 payloads, 12 per goal).
+  The simulator places exactly one payload at a time (`/admin/attack`, planted-only) and switches
+  its built-in templates off while a lab attack is active.
+- **Baseline agent** on PayPal's Agent Toolkit (`paypal-agent-toolkit` 1.11.0, core only):
+  tool loop on the planner's model, browses catalogs and pages, checks out with the toolkit's
+  `create_order` using the chosen merchant's credentials, reads the order back. First runs:
+  real sandbox orders `7NA8946895215061G` and `6DJ25837GV184773G` at Kestrel.
+- Next: the ASR and utility evaluation (baseline vs Provenant on the same tasks and attacks),
+  then Playwright screenshots.
