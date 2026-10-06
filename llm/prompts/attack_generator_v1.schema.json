@@ -1,0 +1,8 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["payloads"],
+  "properties": {
+    "payloads": {"type": "array", "items": {"type": "string", "minLength": 10, "maxLength": 600}, "minItems": 1, "maxItems": 6}
+  }
+}
